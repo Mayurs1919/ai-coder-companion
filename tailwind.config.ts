@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        mono: ["JetBrains Mono", "Fira Code", "Monaco", "Consolas", "monospace"],
+        sans: ["Inter", "system-ui", "sans-serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -57,6 +61,34 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Agent-specific colors
+        agent: {
+          "code-writer": "hsl(var(--agent-code-writer))",
+          refactor: "hsl(var(--agent-refactor))",
+          debug: "hsl(var(--agent-debug))",
+          "test-gen": "hsl(var(--agent-test-gen))",
+          "test-runner": "hsl(var(--agent-test-runner))",
+          reviewer: "hsl(var(--agent-reviewer))",
+          docs: "hsl(var(--agent-docs))",
+          architecture: "hsl(var(--agent-architecture))",
+          api: "hsl(var(--agent-api))",
+          microservices: "hsl(var(--agent-microservices))",
+        },
+        console: {
+          bg: "hsl(var(--console-bg))",
+          success: "hsl(var(--console-success))",
+          error: "hsl(var(--console-error))",
+          warning: "hsl(var(--console-warning))",
+          info: "hsl(var(--console-info))",
+        },
+        syntax: {
+          keyword: "hsl(var(--syntax-keyword))",
+          string: "hsl(var(--syntax-string))",
+          function: "hsl(var(--syntax-function))",
+          variable: "hsl(var(--syntax-variable))",
+          comment: "hsl(var(--syntax-comment))",
+          number: "hsl(var(--syntax-number))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -65,25 +97,37 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "fade-in": {
+          from: { opacity: "0", transform: "translateY(10px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "slide-in-left": {
+          from: { opacity: "0", transform: "translateX(-20px)" },
+          to: { opacity: "1", transform: "translateX(0)" },
+        },
+        "glow-pulse": {
+          "0%, 100%": { boxShadow: "0 0 20px hsl(var(--primary) / 0.2)" },
+          "50%": { boxShadow: "0 0 40px hsl(var(--primary) / 0.4)" },
+        },
+        "typing": {
+          from: { width: "0" },
+          to: { width: "100%" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.3s ease-out",
+        "slide-in-left": "slide-in-left 0.3s ease-out",
+        "glow-pulse": "glow-pulse 2s ease-in-out infinite",
+        "typing": "typing 2s steps(40, end)",
       },
     },
   },
