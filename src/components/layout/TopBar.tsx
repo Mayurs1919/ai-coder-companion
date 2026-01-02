@@ -1,6 +1,7 @@
 import { Bell, Settings, Zap, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { UserMenu } from './UserMenu';
 
 export function TopBar() {
   return (
@@ -33,6 +34,7 @@ export function TopBar() {
         <Button variant="ghost" size="icon" className="h-9 w-9">
           <Settings className="h-4 w-4" />
         </Button>
+        <UserMenu />
       </div>
     </header>
   );
