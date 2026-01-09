@@ -1,17 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Loader2, Copy, Check, ArrowLeft } from 'lucide-react';
+import { Send, Loader2, Copy, Check, ArrowLeft, Maximize2 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAgentStore } from '@/stores/agentStore';
 import { useConsoleStore } from '@/stores/consoleStore';
 import { AGENTS, AgentId } from '@/types/agents';
 import { cn } from '@/lib/utils';
+import { FullscreenCodeViewer } from './FullscreenCodeViewer';
 import {
   Code2,
   Wand2,
@@ -44,6 +44,7 @@ export function AgentWorkspace() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [fullscreenCode, setFullscreenCode] = useState<{ code: string; language: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   
   const { messages, addMessage, updateLastMessage, updateAgentStatus, getAgent } = useAgentStore();
@@ -224,19 +225,30 @@ export function AgentWorkspace() {
             <Badge variant="secondary" className="text-xs font-mono">
               {block.language}
             </Badge>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7"
-              onClick={() => handleCopy(block.code, messageIndex * 100 + blockIndex)}
-            >
-              {copiedIndex === messageIndex * 100 + blockIndex ? (
-                <Check className="w-3 h-3 mr-1" />
-              ) : (
-                <Copy className="w-3 h-3 mr-1" />
-              )}
-              Copy
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7"
+                onClick={() => handleCopy(block.code, messageIndex * 100 + blockIndex)}
+              >
+                {copiedIndex === messageIndex * 100 + blockIndex ? (
+                  <Check className="w-3 h-3 mr-1" />
+                ) : (
+                  <Copy className="w-3 h-3 mr-1" />
+                )}
+                Copy
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7"
+                onClick={() => setFullscreenCode({ code: block.code, language: block.language })}
+              >
+                <Maximize2 className="w-3 h-3 mr-1" />
+                Expand
+              </Button>
+            </div>
           </div>
           <Editor
             height="200px"
@@ -404,6 +416,13 @@ export function AgentWorkspace() {
           </p>
         </div>
       </Card>
+
+      <FullscreenCodeViewer
+        isOpen={fullscreenCode !== null}
+        onClose={() => setFullscreenCode(null)}
+        code={fullscreenCode?.code || ''}
+        language={fullscreenCode?.language || 'plaintext'}
+      />
     </div>
   );
 }
