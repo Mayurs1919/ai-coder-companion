@@ -52,12 +52,41 @@ export function AgentWorkspace() {
   
   const agent = getAgent(agentId as AgentId);
   const agentMessages = messages[agentId as AgentId] || [];
+  const prevMessagesLengthRef = useRef(agentMessages.length);
+  const prevLoadingRef = useRef(isLoading);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [agentMessages]);
+
+  // Auto-open fullscreen code viewer when code generation completes
+  useEffect(() => {
+    const wasLoading = prevLoadingRef.current;
+    const isNowNotLoading = !isLoading;
+    const hasNewMessage = agentMessages.length > prevMessagesLengthRef.current;
+    
+    // Check if loading just finished (transition from loading to not loading)
+    if (wasLoading && isNowNotLoading && agentMessages.length > 0) {
+      const lastMessage = agentMessages[agentMessages.length - 1];
+      
+      // Only auto-expand for assistant messages with code
+      if (lastMessage.role === 'assistant' && lastMessage.content) {
+        const codeBlocks = extractCodeBlocks(lastMessage.content);
+        if (codeBlocks.length > 0) {
+          // Auto-open the first code block in fullscreen
+          setFullscreenCode({
+            code: codeBlocks[0].code,
+            language: codeBlocks[0].language,
+          });
+        }
+      }
+    }
+    
+    prevMessagesLengthRef.current = agentMessages.length;
+    prevLoadingRef.current = isLoading;
+  }, [isLoading, agentMessages]);
 
   if (!agent) {
     return (
