@@ -43,7 +43,7 @@ export default function Auth() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!loading && user) {
-      navigate('/');
+      navigate('/dashboard');
     }
   }, [user, loading, navigate]);
 
@@ -66,7 +66,7 @@ export default function Auth() {
             title: "Welcome back!",
             description: "You've been logged in successfully.",
           });
-          navigate('/');
+          navigate('/dashboard');
         }
       } else {
         const { error } = await signUp(data.email, data.password);
@@ -87,9 +87,9 @@ export default function Auth() {
         } else {
           toast({
             title: "Account created!",
-            description: "Welcome to AI Code Viewer.",
+            description: "Welcome to AI Code Agent.",
           });
-          navigate('/');
+          navigate('/dashboard');
         }
       }
     } finally {

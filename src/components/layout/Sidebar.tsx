@@ -39,7 +39,7 @@ export function Sidebar() {
   const location = useLocation();
 
   const navItems: { path: string; icon: React.ComponentType<{ className?: string }>; label: string; color?: string }[] = [
-    { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     ...AGENTS.map(agent => ({
       path: `/agent/${agent.id}`,
       icon: iconMap[agent.icon] || Code2,
@@ -63,7 +63,7 @@ export function Sidebar() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Code2 className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-sm text-sidebar-foreground">AI-Code Viewer</span>
+            <span className="font-semibold text-sm text-sidebar-foreground">AI Code Agent</span>
           </div>
         )}
         <Button
