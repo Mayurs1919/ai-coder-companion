@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Dashboard } from "@/components/dashboard/Dashboard";
 import { AgentWorkspace } from "@/components/agents/AgentWorkspace";
+import { LandingPage } from "@/components/landing/LandingPage";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -21,9 +22,13 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* Public landing page */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<Auth />} />
+            
+            {/* Protected dashboard */}
             <Route
-              path="/"
+              path="/dashboard"
               element={
                 <ProtectedRoute>
                   <AppLayout>
