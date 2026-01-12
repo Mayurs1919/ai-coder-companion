@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { AGENTS } from '@/types/agents';
 import {
   Code2,
   Wand2,
   Bug,
   FlaskConical,
-  Play,
   GitPullRequest,
   FileText,
   Network,
@@ -17,36 +15,58 @@ import {
   ChevronLeft,
   ChevronRight,
   Shield,
+  Wrench,
+  TestTube2,
+  BookOpen,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  Code2,
-  Wand2,
-  Bug,
-  FlaskConical,
-  Play,
-  GitPullRequest,
-  FileText,
-  Network,
-  Webhook,
-  Boxes,
-};
+interface NavItem {
+  path: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  color?: string;
+}
+
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
 
-  const navItems: { path: string; icon: React.ComponentType<{ className?: string }>; label: string; color?: string }[] = [
-    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    ...AGENTS.map(agent => ({
-      path: `/agent/${agent.id}`,
-      icon: iconMap[agent.icon] || Code2,
-      label: agent.name,
-      color: agent.color,
-    })),
-    { path: '/security', icon: Shield, label: 'Security Scan', color: 'agent-debug' },
+  const navSections: NavSection[] = [
+    {
+      title: 'BUILD',
+      items: [
+        { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+        { path: '/agent/code-writer', icon: Code2, label: 'Code Writer', color: 'agent-code-writer' },
+        { path: '/agent/refactor', icon: Wand2, label: 'Code Refactor', color: 'agent-refactor' },
+        { path: '/agent/architecture', icon: Boxes, label: 'Architecture', color: 'agent-architecture' },
+        { path: '/agent/usage', icon: BarChart3, label: 'Usage', color: 'agent-usage' },
+      ],
+    },
+    {
+      title: 'QUALITY',
+      items: [
+        { path: '/agent/debug', icon: Bug, label: 'Bug Finder', color: 'agent-debug' },
+        { path: '/agent/bug-fixer', icon: Wrench, label: 'Bug Fixer', color: 'agent-bug-fixer' },
+        { path: '/agent/api', icon: Webhook, label: 'API Structure', color: 'agent-api' },
+        { path: '/agent/test', icon: TestTube2, label: 'Test Generator', color: 'agent-test' },
+      ],
+    },
+    {
+      title: 'REVIEW & DOCS',
+      items: [
+        { path: '/agent/docs', icon: BookOpen, label: 'Documentation', color: 'agent-docs' },
+        { path: '/agent/review', icon: GitPullRequest, label: 'PR Reviewer', color: 'agent-review' },
+        { path: '/security', icon: Shield, label: 'Security Scan', color: 'agent-security' },
+      ],
+    },
   ];
 
   return (
@@ -77,49 +97,64 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 overflow-y-auto">
-        <ul className="space-y-1 px-2">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
+      <nav className="flex-1 py-2 overflow-y-auto">
+        {navSections.map((section, sectionIndex) => (
+          <div key={section.title} className={cn(sectionIndex > 0 && 'mt-4')}>
+            {/* Section Title */}
+            {!collapsed && (
+              <div className="px-4 py-2">
+                <span className="text-[10px] font-semibold tracking-wider text-muted-foreground/70">
+                  {section.title}
+                </span>
+              </div>
+            )}
+            {collapsed && sectionIndex > 0 && (
+              <div className="mx-3 my-2 border-t border-sidebar-border" />
+            )}
+            <ul className="space-y-0.5 px-2">
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.path;
 
-            const linkContent = (
-              <NavLink
-                to={item.path}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-                  'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                  isActive
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                    : 'text-sidebar-foreground'
-                )}
-              >
-                <Icon
-                  className={cn(
-                    'h-5 w-5 flex-shrink-0',
-                    item.color && isActive ? `text-${item.color}` : ''
-                  )}
-                />
-                {!collapsed && <span className="truncate">{item.label}</span>}
-              </NavLink>
-            );
+                const linkContent = (
+                  <NavLink
+                    to={item.path}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+                      'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                      isActive
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                        : 'text-sidebar-foreground'
+                    )}
+                  >
+                    <Icon
+                      className={cn(
+                        'h-5 w-5 flex-shrink-0',
+                        item.color && isActive ? `text-${item.color}` : ''
+                      )}
+                    />
+                    {!collapsed && <span className="truncate">{item.label}</span>}
+                  </NavLink>
+                );
 
-            if (collapsed) {
-              return (
-                <li key={item.path}>
-                  <Tooltip delayDuration={0}>
-                    <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
-                    <TooltipContent side="right" className="font-medium">
-                      {item.label}
-                    </TooltipContent>
-                  </Tooltip>
-                </li>
-              );
-            }
+                if (collapsed) {
+                  return (
+                    <li key={item.path}>
+                      <Tooltip delayDuration={0}>
+                        <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+                        <TooltipContent side="right" className="font-medium">
+                          {item.label}
+                        </TooltipContent>
+                      </Tooltip>
+                    </li>
+                  );
+                }
 
-            return <li key={item.path}>{linkContent}</li>;
-          })}
-        </ul>
+                return <li key={item.path}>{linkContent}</li>;
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}
