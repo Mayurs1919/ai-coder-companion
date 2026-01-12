@@ -1,11 +1,15 @@
 import { useState } from 'react';
-import { Terminal, Trash2, Download, Filter } from 'lucide-react';
+import { Terminal, Trash2, Download, Filter, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useConsoleStore } from '@/stores/consoleStore';
 
-export function ConsolePanel() {
+interface ConsolePanelProps {
+  onToggle?: () => void;
+}
+
+export function ConsolePanel({ onToggle }: ConsolePanelProps) {
   const { logs, clearLogs } = useConsoleStore();
   const [filter, setFilter] = useState<'all' | 'info' | 'success' | 'warning' | 'error'>('all');
 
@@ -62,6 +66,12 @@ export function ConsolePanel() {
           <Button variant="ghost" size="icon" className="h-7 w-7">
             <Download className="w-3 h-3" />
           </Button>
+          {onToggle && (
+            <Button variant="ghost" size="sm" className="h-7 px-2" onClick={onToggle}>
+              <ChevronDown className="w-4 h-4 mr-1" />
+              <span className="text-xs">Hide</span>
+            </Button>
+          )}
         </div>
       </div>
 
