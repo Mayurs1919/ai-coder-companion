@@ -111,7 +111,7 @@
   }
 
   html {
-    @apply dark;
+    /* Theme is controlled by next-themes */
   }
 
   body {

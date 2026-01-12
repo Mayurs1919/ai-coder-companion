@@ -2,12 +2,17 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Sparkles, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export function HeroSection() {
   const navigate = useNavigate();
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      {/* Theme toggle - fixed top right */}
+      <div className="absolute top-6 right-6 z-20">
+        <ThemeToggle />
+      </div>
       {/* Animated background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/10" />
       
