@@ -48,3 +48,67 @@ export interface CostBreakdown {
   perArtifact: Record<string, number>;
   lowCostHighImpact: string[];
 }
+
+// Phase 2 Types
+export interface ProductivityMetrics {
+  timeSavedHours: number;
+  tasksAutomated: number;
+  reducedRework: number;
+  testCoverageImprovement: number;
+  codeReviewsAccelerated: number;
+  weeklyTrend: { week: string; hoursSaved: number }[];
+}
+
+export interface PromptMetrics {
+  totalPrompts: number;
+  successRate: number;
+  retryFrequency: number;
+  averageVerbosity: number;
+  qualityScore: number;
+  insights: PromptInsight[];
+  agentEfficiency: { agentId: string; agentName: string; successRate: number; avgTokens: number }[];
+}
+
+export interface PromptInsight {
+  id: string;
+  type: 'improvement' | 'warning' | 'success';
+  message: string;
+  impact: 'high' | 'medium' | 'low';
+}
+
+export interface GovernanceConfig {
+  dailyLimit: number;
+  monthlyLimit: number;
+  costThreshold: number;
+  enabledAgents: string[];
+  alertsEnabled: boolean;
+}
+
+export interface UsageAlert {
+  id: string;
+  type: 'limit_warning' | 'cost_threshold' | 'anomaly';
+  message: string;
+  severity: 'info' | 'warning' | 'critical';
+  timestamp: string;
+  acknowledged: boolean;
+}
+
+export interface AuditEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  agentId: string;
+  agentName: string;
+  action: string;
+  tokens: number;
+  cost: number;
+  status: 'success' | 'failed';
+  timestamp: string;
+}
+
+export interface GovernanceState {
+  config: GovernanceConfig;
+  currentUsage: { daily: number; monthly: number; cost: number };
+  alerts: UsageAlert[];
+  auditTrail: AuditEntry[];
+}
