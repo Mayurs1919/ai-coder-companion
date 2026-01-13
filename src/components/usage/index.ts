@@ -4,3 +4,6 @@ export { UsageTrends } from './UsageTrends';
 export { AgentAnalytics } from './AgentAnalytics';
 export { ArtifactTracking } from './ArtifactTracking';
 export { CostAwareness } from './CostAwareness';
+export { ProductivityIntelligence } from './ProductivityIntelligence';
+export { PromptOptimization } from './PromptOptimization';
+export { GovernanceControls } from './GovernanceControls';

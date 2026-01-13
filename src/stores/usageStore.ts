@@ -1,5 +1,14 @@
 import { create } from 'zustand';
-import type { UsageOverview, DailyUsage, AgentUsage, ArtifactStats, CostBreakdown } from '@/types/usage';
+import type { 
+  UsageOverview, 
+  DailyUsage, 
+  AgentUsage, 
+  ArtifactStats, 
+  CostBreakdown,
+  ProductivityMetrics,
+  PromptMetrics,
+  GovernanceState
+} from '@/types/usage';
 
 interface UsageState {
   overview: UsageOverview;
@@ -7,6 +16,13 @@ interface UsageState {
   agentUsage: AgentUsage[];
   artifactStats: ArtifactStats;
   costBreakdown: CostBreakdown;
+  // Phase 2
+  productivityMetrics: ProductivityMetrics;
+  promptMetrics: PromptMetrics;
+  governance: GovernanceState;
+  // Actions
+  updateGovernanceConfig: (config: Partial<GovernanceState['config']>) => void;
+  acknowledgeAlert: (alertId: string) => void;
 }
 
 // Generate mock daily data for the last 14 days
@@ -165,12 +181,110 @@ const mockCostBreakdown: CostBreakdown = {
   lowCostHighImpact: ['docs', 'api', 'reviewer'],
 };
 
+// Phase 2 Mock Data
+const mockProductivityMetrics: ProductivityMetrics = {
+  timeSavedHours: 47.2,
+  tasksAutomated: 234,
+  reducedRework: 18,
+  testCoverageImprovement: 23,
+  codeReviewsAccelerated: 42,
+  weeklyTrend: [
+    { week: 'Week 1', hoursSaved: 8.5 },
+    { week: 'Week 2', hoursSaved: 12.3 },
+    { week: 'Week 3', hoursSaved: 11.8 },
+    { week: 'Week 4', hoursSaved: 14.6 },
+  ],
+};
+
+const mockPromptMetrics: PromptMetrics = {
+  totalPrompts: 460,
+  successRate: 94.2,
+  retryFrequency: 8.3,
+  averageVerbosity: 156,
+  qualityScore: 87,
+  insights: [
+    {
+      id: '1',
+      type: 'improvement',
+      message: 'Shorter prompts (under 100 tokens) yielded 23% faster responses for Code Writer agent.',
+      impact: 'high',
+    },
+    {
+      id: '2',
+      type: 'success',
+      message: 'Your prompts for Test Generator have a 98% success rate - well above average!',
+      impact: 'medium',
+    },
+    {
+      id: '3',
+      type: 'warning',
+      message: 'Bug Finder retries are 15% higher than baseline. Consider adding more context to prompts.',
+      impact: 'high',
+    },
+    {
+      id: '4',
+      type: 'improvement',
+      message: 'Including file paths in Architecture prompts improved accuracy by 31%.',
+      impact: 'medium',
+    },
+  ],
+  agentEfficiency: [
+    { agentId: 'code-writer', agentName: 'Code Writer', successRate: 96, avgTokens: 1570 },
+    { agentId: 'test-gen', agentName: 'Test Generator', successRate: 98, avgTokens: 1980 },
+    { agentId: 'docs', agentName: 'Documentation', successRate: 99, avgTokens: 1970 },
+    { agentId: 'refactor', agentName: 'Code Refactor', successRate: 94, avgTokens: 2000 },
+    { agentId: 'debug', agentName: 'Bug Finder', successRate: 91, avgTokens: 2000 },
+    { agentId: 'reviewer', agentName: 'PR Reviewer', successRate: 97, avgTokens: 2000 },
+  ],
+};
+
+const mockGovernance: GovernanceState = {
+  config: {
+    dailyLimit: 100,
+    monthlyLimit: 2000,
+    costThreshold: 50,
+    enabledAgents: ['code-writer', 'refactor', 'debug', 'test-gen', 'docs', 'architecture', 'api', 'reviewer'],
+    alertsEnabled: true,
+  },
+  currentUsage: {
+    daily: 34,
+    monthly: 460,
+    cost: 29.18,
+  },
+  alerts: [
+    {
+      id: '1',
+      type: 'limit_warning',
+      message: 'Daily usage at 34% of limit',
+      severity: 'info',
+      timestamp: '2025-01-13T10:30:00Z',
+      acknowledged: true,
+    },
+    {
+      id: '2',
+      type: 'cost_threshold',
+      message: 'Monthly cost approaching 60% of threshold',
+      severity: 'warning',
+      timestamp: '2025-01-13T09:15:00Z',
+      acknowledged: false,
+    },
+  ],
+  auditTrail: [
+    { id: '1', userId: 'u1', userName: 'Alex Chen', agentId: 'code-writer', agentName: 'Code Writer', action: 'Generate API endpoint', tokens: 2340, cost: 0.047, status: 'success', timestamp: '2025-01-13T11:45:00Z' },
+    { id: '2', userId: 'u2', userName: 'Sam Rivera', agentId: 'test-gen', agentName: 'Test Generator', action: 'Create unit tests', tokens: 1890, cost: 0.038, status: 'success', timestamp: '2025-01-13T11:32:00Z' },
+    { id: '3', userId: 'u1', userName: 'Alex Chen', agentId: 'debug', agentName: 'Bug Finder', action: 'Analyze memory leak', tokens: 3120, cost: 0.062, status: 'success', timestamp: '2025-01-13T11:20:00Z' },
+    { id: '4', userId: 'u3', userName: 'Jordan Lee', agentId: 'refactor', agentName: 'Code Refactor', action: 'Optimize database queries', tokens: 2780, cost: 0.056, status: 'failed', timestamp: '2025-01-13T11:05:00Z' },
+    { id: '5', userId: 'u2', userName: 'Sam Rivera', agentId: 'docs', agentName: 'Documentation', action: 'Generate API docs', tokens: 1560, cost: 0.031, status: 'success', timestamp: '2025-01-13T10:48:00Z' },
+    { id: '6', userId: 'u1', userName: 'Alex Chen', agentId: 'reviewer', agentName: 'PR Reviewer', action: 'Review authentication PR', tokens: 4200, cost: 0.084, status: 'success', timestamp: '2025-01-13T10:30:00Z' },
+  ],
+};
+
 const dailyData = generateDailyUsage();
 const totalRequests = dailyData.reduce((sum, d) => sum + d.requests, 0);
 const totalTokens = dailyData.reduce((sum, d) => sum + d.tokens, 0);
 const totalCost = dailyData.reduce((sum, d) => sum + d.cost, 0);
 
-export const useUsageStore = create<UsageState>(() => ({
+export const useUsageStore = create<UsageState>((set) => ({
   overview: {
     totalRequests,
     totalTokens,
@@ -182,4 +296,25 @@ export const useUsageStore = create<UsageState>(() => ({
   agentUsage: mockAgentUsage,
   artifactStats: mockArtifactStats,
   costBreakdown: mockCostBreakdown,
+  productivityMetrics: mockProductivityMetrics,
+  promptMetrics: mockPromptMetrics,
+  governance: mockGovernance,
+  
+  updateGovernanceConfig: (config) =>
+    set((state) => ({
+      governance: {
+        ...state.governance,
+        config: { ...state.governance.config, ...config },
+      },
+    })),
+    
+  acknowledgeAlert: (alertId) =>
+    set((state) => ({
+      governance: {
+        ...state.governance,
+        alerts: state.governance.alerts.map((alert) =>
+          alert.id === alertId ? { ...alert, acknowledged: true } : alert
+        ),
+      },
+    })),
 }));
