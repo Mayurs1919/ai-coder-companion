@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Loader2, Copy, Check, ArrowLeft, Maximize2 } from 'lucide-react';
+import { Send, Loader2, Copy, Check, ArrowLeft, Maximize2, Download } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,9 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAgentStore } from '@/stores/agentStore';
 import { useConsoleStore } from '@/stores/consoleStore';
+import { useSessionUsageStore } from '@/stores/sessionUsageStore';
 import { AGENTS, AgentId } from '@/types/agents';
 import { cn } from '@/lib/utils';
 import { FullscreenCodeViewer } from './FullscreenCodeViewer';
+import { AgentMetricsPanel } from './AgentMetricsPanel';
 import {
   Code2,
   Wand2,
@@ -45,15 +47,38 @@ export function AgentWorkspace() {
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [fullscreenCode, setFullscreenCode] = useState<{ code: string; language: string } | null>(null);
+  const [lastPrompt, setLastPrompt] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const requestStartTime = useRef<number>(0);
   
   const { messages, addMessage, updateLastMessage, updateAgentStatus, getAgent } = useAgentStore();
   const { addLog } = useConsoleStore();
+  const { 
+    initSession, 
+    trackRequest, 
+    trackSuccess, 
+    trackError, 
+    trackRetry,
+    trackCopy, 
+    trackExpand, 
+    trackDownload,
+    trackLanguage,
+    setActiveSession 
+  } = useSessionUsageStore();
   
   const agent = getAgent(agentId as AgentId);
   const agentMessages = messages[agentId as AgentId] || [];
   const prevMessagesLengthRef = useRef(agentMessages.length);
   const prevLoadingRef = useRef(isLoading);
+
+  // Initialize session on mount
+  useEffect(() => {
+    if (agentId) {
+      initSession(agentId as AgentId);
+      setActiveSession(agentId as AgentId);
+    }
+    return () => setActiveSession(null);
+  }, [agentId, initSession, setActiveSession]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -65,20 +90,20 @@ export function AgentWorkspace() {
   useEffect(() => {
     const wasLoading = prevLoadingRef.current;
     const isNowNotLoading = !isLoading;
-    const hasNewMessage = agentMessages.length > prevMessagesLengthRef.current;
     
-    // Check if loading just finished (transition from loading to not loading)
     if (wasLoading && isNowNotLoading && agentMessages.length > 0) {
       const lastMessage = agentMessages[agentMessages.length - 1];
       
-      // Only auto-expand for assistant messages with code
       if (lastMessage.role === 'assistant' && lastMessage.content) {
         const codeBlocks = extractCodeBlocks(lastMessage.content);
         if (codeBlocks.length > 0) {
-          // Auto-open the first code block in fullscreen
           setFullscreenCode({
             code: codeBlocks[0].code,
             language: codeBlocks[0].language,
+          });
+          // Track languages used
+          codeBlocks.forEach(block => {
+            trackLanguage(agentId as AgentId, block.language);
           });
         }
       }
@@ -86,7 +111,7 @@ export function AgentWorkspace() {
     
     prevMessagesLengthRef.current = agentMessages.length;
     prevLoadingRef.current = isLoading;
-  }, [isLoading, agentMessages]);
+  }, [isLoading, agentMessages, agentId, trackLanguage]);
 
   if (!agent) {
     return (
@@ -102,8 +127,19 @@ export function AgentWorkspace() {
     if (!input.trim() || isLoading) return;
 
     const userMessage = input.trim();
+    
+    // Check if this is a retry (same prompt as last time)
+    if (userMessage === lastPrompt && lastPrompt !== '') {
+      trackRetry(agentId as AgentId);
+    }
+    setLastPrompt(userMessage);
+    
     setInput('');
     setIsLoading(true);
+    requestStartTime.current = Date.now();
+
+    // Track the request
+    trackRequest(agentId as AgentId, requestStartTime.current);
 
     addMessage(agentId as AgentId, {
       agentId: agentId as AgentId,
@@ -115,7 +151,6 @@ export function AgentWorkspace() {
     addLog('info', `Processing request with ${agent.name}...`, agentId as AgentId);
 
     try {
-      // Add empty assistant message for streaming
       addMessage(agentId as AgentId, {
         agentId: agentId as AgentId,
         role: 'assistant',
@@ -154,6 +189,7 @@ export function AgentWorkspace() {
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let assistantContent = '';
+      let tokenEstimate = 0;
 
       if (reader) {
         while (true) {
@@ -174,6 +210,7 @@ export function AgentWorkspace() {
               const content = parsed.choices?.[0]?.delta?.content;
               if (content) {
                 assistantContent += content;
+                tokenEstimate += content.length / 4; // Rough token estimate
                 updateLastMessage(agentId as AgentId, assistantContent);
               }
             } catch {
@@ -183,10 +220,14 @@ export function AgentWorkspace() {
         }
       }
 
+      const responseTime = Date.now() - requestStartTime.current;
+      trackSuccess(agentId as AgentId, responseTime, Math.round(tokenEstimate));
+      
       updateAgentStatus(agentId as AgentId, 'success');
       addLog('success', `${agent.name} completed task`, agentId as AgentId);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      trackError(agentId as AgentId);
       updateAgentStatus(agentId as AgentId, 'error');
       addLog('error', `${agent.name} failed: ${errorMessage}`, agentId as AgentId);
       
@@ -202,7 +243,54 @@ export function AgentWorkspace() {
   const handleCopy = async (text: string, index: number) => {
     await navigator.clipboard.writeText(text);
     setCopiedIndex(index);
+    trackCopy(agentId as AgentId);
     setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const handleExpand = (code: string, language: string) => {
+    setFullscreenCode({ code, language });
+    trackExpand(agentId as AgentId);
+  };
+
+  const handleDownload = (code: string, language: string) => {
+    const extension = getFileExtension(language);
+    const blob = new Blob([code], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `code.${extension}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    trackDownload(agentId as AgentId);
+  };
+
+  const getFileExtension = (language: string): string => {
+    const extensions: Record<string, string> = {
+      javascript: 'js',
+      typescript: 'ts',
+      python: 'py',
+      java: 'java',
+      cpp: 'cpp',
+      c: 'c',
+      go: 'go',
+      rust: 'rs',
+      ruby: 'rb',
+      php: 'php',
+      swift: 'swift',
+      kotlin: 'kt',
+      scala: 'scala',
+      html: 'html',
+      css: 'css',
+      json: 'json',
+      yaml: 'yaml',
+      markdown: 'md',
+      sql: 'sql',
+      shell: 'sh',
+      bash: 'sh',
+    };
+    return extensions[language.toLowerCase()] || 'txt';
   };
 
   const extractCodeBlocks = (content: string) => {
@@ -227,7 +315,6 @@ export function AgentWorkspace() {
       return <p className="whitespace-pre-wrap">{content}</p>;
     }
 
-    // Split content by code blocks and render
     let remainingContent = content;
     const parts: React.ReactNode[] = [];
 
@@ -272,7 +359,16 @@ export function AgentWorkspace() {
                 variant="ghost"
                 size="sm"
                 className="h-7"
-                onClick={() => setFullscreenCode({ code: block.code, language: block.language })}
+                onClick={() => handleDownload(block.code, block.language)}
+              >
+                <Download className="w-3 h-3 mr-1" />
+                Download
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7"
+                onClick={() => handleExpand(block.code, block.language)}
               >
                 <Maximize2 className="w-3 h-3 mr-1" />
                 Expand
@@ -314,137 +410,145 @@ export function AgentWorkspace() {
   };
 
   return (
-    <div className="h-full flex flex-col animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/')}
-          className="shrink-0"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div
-          className={cn(
-            'w-12 h-12 rounded-lg flex items-center justify-center',
-            `bg-${agent.color}/20`
-          )}
-        >
-          <Icon className={cn('w-6 h-6', `text-${agent.color}`)} />
+    <div className="h-full flex gap-4 animate-fade-in">
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/')}
+            className="shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div
+            className={cn(
+              'w-12 h-12 rounded-lg flex items-center justify-center',
+              `bg-${agent.color}/20`
+            )}
+          >
+            <Icon className={cn('w-6 h-6', `text-${agent.color}`)} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold">{agent.name}</h1>
+            <p className="text-sm text-muted-foreground">{agent.description}</p>
+          </div>
+          <Badge
+            variant={agent.status === 'processing' ? 'default' : 'secondary'}
+            className={cn(
+              'ml-auto',
+              agent.status === 'processing' && 'animate-pulse'
+            )}
+          >
+            {agent.status === 'processing' ? 'Processing...' : 'Ready'}
+          </Badge>
         </div>
-        <div>
-          <h1 className="text-xl font-bold">{agent.name}</h1>
-          <p className="text-sm text-muted-foreground">{agent.description}</p>
-        </div>
-        <Badge
-          variant={agent.status === 'processing' ? 'default' : 'secondary'}
-          className={cn(
-            'ml-auto',
-            agent.status === 'processing' && 'animate-pulse'
-          )}
-        >
-          {agent.status === 'processing' ? 'Processing...' : 'Ready'}
-        </Badge>
+
+        {/* Chat Area */}
+        <Card className="flex-1 flex flex-col min-h-0">
+          <CardHeader className="border-b py-3">
+            <CardTitle className="text-sm font-medium">Conversation</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1 p-0 min-h-0">
+            <ScrollArea className="h-full p-4" ref={scrollRef}>
+              {agentMessages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                  <Icon className={cn('w-12 h-12 mb-4', `text-${agent.color}/50`)} />
+                  <h3 className="font-medium mb-2">Start a conversation</h3>
+                  <p className="text-sm text-muted-foreground max-w-sm">
+                    Describe what you need and the {agent.name} will help you.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {agentMessages.map((message, index) => (
+                    <div
+                      key={message.id}
+                      className={cn(
+                        'flex gap-3',
+                        message.role === 'user' && 'flex-row-reverse'
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
+                          message.role === 'user'
+                            ? 'bg-primary'
+                            : `bg-${agent.color}/20`
+                        )}
+                      >
+                        {message.role === 'user' ? (
+                          <span className="text-xs font-medium text-primary-foreground">
+                            You
+                          </span>
+                        ) : (
+                          <Icon className={cn('w-4 h-4', `text-${agent.color}`)} />
+                        )}
+                      </div>
+                      <div
+                        className={cn(
+                          'flex-1 rounded-lg p-4',
+                          message.role === 'user'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted'
+                        )}
+                      >
+                        {message.role === 'assistant' && isLoading && !message.content ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span className="text-sm">Thinking...</span>
+                          </div>
+                        ) : (
+                          renderMessageContent(message.content, index)
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+          
+          {/* Input Area */}
+          <div className="p-4 border-t">
+            <div className="flex gap-2">
+              <Textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={`Ask the ${agent.name} something...`}
+                className="min-h-[80px] resize-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+              />
+              <Button
+                onClick={handleSubmit}
+                disabled={!input.trim() || isLoading}
+                className="h-auto px-4"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Press Enter to send, Shift+Enter for new line
+            </p>
+          </div>
+        </Card>
       </div>
 
-      {/* Chat Area */}
-      <Card className="flex-1 flex flex-col min-h-0">
-        <CardHeader className="border-b py-3">
-          <CardTitle className="text-sm font-medium">Conversation</CardTitle>
-        </CardHeader>
-        <CardContent className="flex-1 p-0 min-h-0">
-          <ScrollArea className="h-full p-4" ref={scrollRef}>
-            {agentMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center p-8">
-                <Icon className={cn('w-12 h-12 mb-4', `text-${agent.color}/50`)} />
-                <h3 className="font-medium mb-2">Start a conversation</h3>
-                <p className="text-sm text-muted-foreground max-w-sm">
-                  Describe what you need and the {agent.name} will help you.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {agentMessages.map((message, index) => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      'flex gap-3',
-                      message.role === 'user' && 'flex-row-reverse'
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
-                        message.role === 'user'
-                          ? 'bg-primary'
-                          : `bg-${agent.color}/20`
-                      )}
-                    >
-                      {message.role === 'user' ? (
-                        <span className="text-xs font-medium text-primary-foreground">
-                          You
-                        </span>
-                      ) : (
-                        <Icon className={cn('w-4 h-4', `text-${agent.color}`)} />
-                      )}
-                    </div>
-                    <div
-                      className={cn(
-                        'flex-1 rounded-lg p-4',
-                        message.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted'
-                      )}
-                    >
-                      {message.role === 'assistant' && isLoading && !message.content ? (
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span className="text-sm">Thinking...</span>
-                        </div>
-                      ) : (
-                        renderMessageContent(message.content, index)
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
-        </CardContent>
-        
-        {/* Input Area */}
-        <div className="p-4 border-t">
-          <div className="flex gap-2">
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={`Ask the ${agent.name} something...`}
-              className="min-h-[80px] resize-none"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit();
-                }
-              }}
-            />
-            <Button
-              onClick={handleSubmit}
-              disabled={!input.trim() || isLoading}
-              className="h-auto px-4"
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Press Enter to send, Shift+Enter for new line
-          </p>
-        </div>
-      </Card>
+      {/* Metrics Panel */}
+      <div className="w-72 shrink-0 hidden lg:block">
+        <AgentMetricsPanel agentId={agentId as AgentId} />
+      </div>
 
       <FullscreenCodeViewer
         isOpen={fullscreenCode !== null}
