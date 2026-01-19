@@ -46,7 +46,7 @@ export function Sidebar() {
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { path: '/agent/code-writer', icon: Code2, label: 'Code Writer', color: 'agent-code-writer' },
         { path: '/agent/refactor', icon: Wand2, label: 'Code Refactor', color: 'agent-refactor' },
-        { path: '/agent/architecture', icon: Boxes, label: 'Architecture', color: 'agent-architecture' },
+        { path: '/agent/sys-engineer', icon: FileText, label: 'SysEngineer', color: 'agent-docs' },
         { path: '/agent/usage', icon: BarChart3, label: 'Usage', color: 'agent-usage' },
       ],
     },
@@ -54,16 +54,15 @@ export function Sidebar() {
       title: 'QUALITY',
       items: [
         { path: '/agent/debug', icon: Bug, label: 'Bug Finder', color: 'agent-debug' },
-        { path: '/agent/bug-fixer', icon: Wrench, label: 'Bug Fixer', color: 'agent-bug-fixer' },
         { path: '/agent/api', icon: Webhook, label: 'API Structure', color: 'agent-api' },
-        { path: '/agent/test', icon: TestTube2, label: 'Test Generator', color: 'agent-test' },
+        { path: '/agent/microservices', icon: Boxes, label: 'Microservices', color: 'agent-microservices' },
       ],
     },
     {
       title: 'REVIEW & DOCS',
       items: [
         { path: '/agent/docs', icon: BookOpen, label: 'Documentation', color: 'agent-docs' },
-        { path: '/agent/review', icon: GitPullRequest, label: 'PR Reviewer', color: 'agent-review' },
+        { path: '/agent/reviewer', icon: GitPullRequest, label: 'PR Reviewer', color: 'agent-reviewer' },
         { path: '/security', icon: Shield, label: 'Security Scan', color: 'agent-security' },
       ],
     },

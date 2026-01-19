@@ -2,13 +2,11 @@ export type AgentId =
   | 'code-writer'
   | 'refactor'
   | 'debug'
-  | 'test-gen'
-  | 'test-runner'
   | 'reviewer'
   | 'docs'
-  | 'architecture'
   | 'api'
-  | 'microservices';
+  | 'microservices'
+  | 'sys-engineer';
 
 export type AgentStatus = 'idle' | 'processing' | 'success' | 'error';
 
@@ -71,19 +69,11 @@ export const AGENTS: Agent[] = [
     status: 'idle',
   },
   {
-    id: 'test-gen',
-    name: 'Test Generator',
-    description: 'Creates automated unit tests for existing code',
-    icon: 'FlaskConical',
-    color: 'agent-test-gen',
-    status: 'idle',
-  },
-  {
-    id: 'test-runner',
-    name: 'Test Runner',
-    description: 'Executes tests and reports detailed results',
-    icon: 'Play',
-    color: 'agent-test-runner',
+    id: 'sys-engineer',
+    name: 'SysEngineer',
+    description: 'Generates Use Cases, Requirements, and Test Cases from documents',
+    icon: 'ClipboardList',
+    color: 'agent-sys-engineer',
     status: 'idle',
   },
   {
@@ -100,14 +90,6 @@ export const AGENTS: Agent[] = [
     description: 'Automatically creates technical documentation',
     icon: 'FileText',
     color: 'agent-docs',
-    status: 'idle',
-  },
-  {
-    id: 'architecture',
-    name: 'Architecture',
-    description: 'Designs system architecture before coding',
-    icon: 'Network',
-    color: 'agent-architecture',
     status: 'idle',
   },
   {

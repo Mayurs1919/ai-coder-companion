@@ -73,6 +73,7 @@ export default {
           architecture: "hsl(var(--agent-architecture))",
           api: "hsl(var(--agent-api))",
           microservices: "hsl(var(--agent-microservices))",
+          "sys-engineer": "hsl(var(--agent-sys-engineer))",
         },
         console: {
           bg: "hsl(var(--console-bg))",
