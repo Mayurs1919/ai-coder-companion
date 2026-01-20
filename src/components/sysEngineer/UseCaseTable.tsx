@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, ChevronDown, ChevronUp, ArrowUpDown } from 'lucide-react';
+import { ChevronDown, ChevronUp, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +14,8 @@ import {
 } from '@/components/ui/table';
 import { UseCase, Priority, ItemStatus } from '@/types/sysEngineer';
 import { cn } from '@/lib/utils';
-
+import { ExportDropdown } from './ExportDropdown';
+import { exportUseCasesToDocx, exportUseCasesToXlsx } from '@/lib/exportUtils';
 interface UseCaseTableProps {
   useCases: UseCase[];
   onToggleSelection: (id: string) => void;
@@ -104,7 +105,15 @@ export function UseCaseTable({ useCases, onToggleSelection, onSelectAll }: UseCa
   );
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <ExportDropdown
+          onExportDocx={() => exportUseCasesToDocx(useCases)}
+          onExportXlsx={() => exportUseCasesToXlsx(useCases)}
+          disabled={useCases.length === 0}
+        />
+      </div>
+      <div className="border rounded-lg overflow-hidden">
       <ScrollArea className="max-h-[500px]">
         <Table>
           <TableHeader className="bg-muted/40 sticky top-0">
@@ -211,6 +220,7 @@ export function UseCaseTable({ useCases, onToggleSelection, onSelectAll }: UseCa
           </TableBody>
         </Table>
       </ScrollArea>
+      </div>
     </div>
   );
 }
