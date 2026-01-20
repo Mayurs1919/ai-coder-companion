@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 export function SysEngineerWorkspace() {
   const navigate = useNavigate();
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('use-cases');
   
   const {
     currentStage,
@@ -90,6 +91,7 @@ export function SysEngineerWorkspace() {
     
     setRequirements(mockRequirements);
     setIsProcessing(false);
+    setActiveTab('requirements'); // Auto-switch to Requirements tab
   };
 
   const generateTestCases = async () => {
@@ -115,6 +117,7 @@ export function SysEngineerWorkspace() {
     
     setTestCases(mockTestCases);
     setIsProcessing(false);
+    setActiveTab('test-cases'); // Auto-switch to Test Cases tab
   };
 
   const handleExport = (format: 'docx' | 'pdf' | 'xlsx' | 'txt') => {
@@ -193,7 +196,7 @@ export function SysEngineerWorkspace() {
           )}
 
           {currentStage !== 'upload' && (
-            <Tabs defaultValue={currentStage} className="flex-1 flex flex-col">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
               <TabsList className="mb-4">
                 <TabsTrigger value="use-cases" disabled={useCases.length === 0}>
                   <ClipboardList className="w-4 h-4 mr-2" />Use Cases ({useCases.length})
