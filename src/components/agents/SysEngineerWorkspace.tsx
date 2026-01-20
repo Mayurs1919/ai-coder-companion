@@ -7,22 +7,24 @@ import {
   TestTube, 
   Loader2, 
   Maximize2,
-  Download,
   ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUploadSection } from '@/components/sysEngineer/FileUploadSection';
 import { UseCaseTable } from '@/components/sysEngineer/UseCaseTable';
 import { RequirementTable } from '@/components/sysEngineer/RequirementTable';
 import { TestCaseTable } from '@/components/sysEngineer/TestCaseTable';
-import { TraceabilityMatrix } from '@/components/sysEngineer/TraceabilityMatrix';
 import { EngineerReviewModal } from '@/components/sysEngineer/EngineerReviewModal';
 import { useSysEngineerStore } from '@/stores/sysEngineerStore';
 import { UploadedFile, UseCase, Requirement, TestCase } from '@/types/sysEngineer';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+
+const SYS_ENGINEER_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sys-engineer`;
 
 export function SysEngineerWorkspace() {
   const navigate = useNavigate();
@@ -45,6 +47,7 @@ export function SysEngineerWorkspace() {
     selectAllRequirements,
     setTestCases,
     setIsProcessing,
+    setError,
     getSelectedUseCases,
     getSelectedRequirements,
     reset,
@@ -64,64 +67,260 @@ export function SysEngineerWorkspace() {
   const generateUseCases = async () => {
     if (!uploadedFile) return;
     setIsProcessing(true);
+    setError(null);
     
-    // Simulated generation - in real app, call edge function
-    await new Promise(r => setTimeout(r, 2000));
-    
-    const mockUseCases: UseCase[] = [
-      { id: '1', srNo: 1, useCaseId: 'UC_001', useCaseName: 'User Authentication', description: 'Allow users to login with credentials', actor: 'User', stakeholders: ['Developers', 'Security'], priority: 'High', preCondition: 'User has valid credentials', status: 'Draft', selected: false },
-      { id: '2', srNo: 2, useCaseId: 'UC_002', useCaseName: 'Password Reset', description: 'Enable users to reset forgotten passwords', actor: 'User', stakeholders: ['Developers', 'QA'], priority: 'Medium', preCondition: 'User has registered email', status: 'Draft', selected: false },
-      { id: '3', srNo: 3, useCaseId: 'UC_003', useCaseName: 'Admin Dashboard Access', description: 'Provide admin users with dashboard access', actor: 'Admin', stakeholders: ['Developers', 'PMA'], priority: 'High', preCondition: 'User has admin role', status: 'Draft', selected: false },
-    ];
-    
-    setUseCases(mockUseCases);
-    setIsProcessing(false);
+    try {
+      const response = await fetch(SYS_ENGINEER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          action: 'generate_use_cases',
+          documentContent: uploadedFile.content || `Document: ${uploadedFile.name}\nType: ${uploadedFile.type}\nSize: ${uploadedFile.size} bytes\n\nPlease analyze this document and generate comprehensive use cases.`,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 429) {
+          toast.error('Rate limit exceeded. Please try again later.');
+        } else if (response.status === 402) {
+          toast.error('Payment required. Please add credits to continue.');
+        } else {
+          toast.error(errorData.error || 'Failed to generate use cases');
+        }
+        throw new Error(errorData.error || 'Failed to generate use cases');
+      }
+
+      const data = await response.json();
+      
+      // Transform API response to match our UseCase type
+      const generatedUseCases: UseCase[] = (data.use_cases || []).map((uc: {
+        use_case_id?: string;
+        use_case_name?: string;
+        description?: string;
+        actor?: string;
+        stakeholders?: string[];
+        priority?: string;
+        pre_condition?: string;
+        status?: string;
+      }, idx: number) => ({
+        id: String(idx + 1),
+        srNo: idx + 1,
+        useCaseId: uc.use_case_id || `UC-${String(idx + 1).padStart(3, '0')}`,
+        useCaseName: uc.use_case_name || `Use Case ${idx + 1}`,
+        description: uc.description || '',
+        actor: uc.actor || 'User',
+        stakeholders: uc.stakeholders || ['Developers', 'DevOps', 'QA', 'PM', 'Security'],
+        priority: (uc.priority as 'Low' | 'Medium' | 'High') || 'Medium',
+        preCondition: uc.pre_condition || '',
+        status: 'Draft' as const,
+        selected: false,
+      }));
+
+      if (generatedUseCases.length === 0) {
+        toast.warning('No use cases could be extracted from the document');
+      } else {
+        toast.success(`Generated ${generatedUseCases.length} use cases`);
+      }
+
+      setUseCases(generatedUseCases);
+    } catch (error) {
+      console.error('Error generating use cases:', error);
+      setError(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const generateRequirements = async () => {
     if (selectedUseCases.length === 0) return;
     setIsProcessing(true);
+    setError(null);
     
-    await new Promise(r => setTimeout(r, 2000));
-    
-    const mockRequirements: Requirement[] = selectedUseCases.flatMap((uc, idx) => [
-      { id: `req-${idx}-1`, srNo: idx * 2 + 1, useCaseId: uc.useCaseId, requirementId: `REQ_${String(idx * 2 + 1).padStart(3, '0')}`, requirementTitle: `${uc.useCaseName} - Validation`, description: `Implement validation for ${uc.useCaseName}`, type: 'Functional' as const, priority: uc.priority, status: 'Draft' as const, selected: false },
-      { id: `req-${idx}-2`, srNo: idx * 2 + 2, useCaseId: uc.useCaseId, requirementId: `REQ_${String(idx * 2 + 2).padStart(3, '0')}`, requirementTitle: `${uc.useCaseName} - Performance`, description: `Ensure performance criteria for ${uc.useCaseName}`, type: 'Non-Functional' as const, priority: 'Medium' as const, status: 'Draft' as const, selected: false },
-    ]);
-    
-    setRequirements(mockRequirements);
-    setIsProcessing(false);
-    setActiveTab('requirements'); // Auto-switch to Requirements tab
+    try {
+      // Transform selected use cases to the format expected by the API
+      const useCasesForApi = selectedUseCases.map(uc => ({
+        use_case_id: uc.useCaseId,
+        use_case_name: uc.useCaseName,
+        description: uc.description,
+        actor: uc.actor,
+        stakeholders: uc.stakeholders,
+        priority: uc.priority,
+        pre_condition: uc.preCondition,
+        status: uc.status,
+      }));
+
+      const response = await fetch(SYS_ENGINEER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          action: 'generate_requirements',
+          useCases: useCasesForApi,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 429) {
+          toast.error('Rate limit exceeded. Please try again later.');
+        } else if (response.status === 402) {
+          toast.error('Payment required. Please add credits to continue.');
+        } else {
+          toast.error(errorData.error || 'Failed to generate requirements');
+        }
+        throw new Error(errorData.error || 'Failed to generate requirements');
+      }
+
+      const data = await response.json();
+      
+      // Transform API response to match our Requirement type
+      const generatedRequirements: Requirement[] = (data.requirements || []).map((req: {
+        requirement_id?: string;
+        use_case_id?: string;
+        requirement_title?: string;
+        requirement_text?: string;
+        requirement_type?: string;
+        description?: string;
+        priority?: string;
+        status?: string;
+      }, idx: number) => ({
+        id: String(idx + 1),
+        srNo: idx + 1,
+        useCaseId: req.use_case_id || 'UC-001',
+        requirementId: req.requirement_id || `REQ-${String(idx + 1).padStart(3, '0')}`,
+        requirementTitle: req.requirement_title || req.requirement_text || `Requirement ${idx + 1}`,
+        description: req.description || '',
+        type: (req.requirement_type === 'Non-Functional' ? 'Non-Functional' : 'Functional') as 'Functional' | 'Non-Functional',
+        priority: (req.priority as 'Low' | 'Medium' | 'High') || 'Medium',
+        status: 'Draft' as const,
+        selected: false,
+      }));
+
+      if (generatedRequirements.length === 0) {
+        toast.warning('No requirements could be generated from the selected use cases');
+      } else {
+        toast.success(`Generated ${generatedRequirements.length} requirements`);
+      }
+
+      setRequirements(generatedRequirements);
+      setActiveTab('requirements'); // Auto-switch to Requirements tab
+    } catch (error) {
+      console.error('Error generating requirements:', error);
+      setError(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const generateTestCases = async () => {
     if (selectedRequirements.length === 0) return;
     setIsProcessing(true);
+    setError(null);
     
-    await new Promise(r => setTimeout(r, 2000));
-    
-    const mockTestCases: TestCase[] = selectedRequirements.map((req, idx) => ({
-      id: `tc-${idx}`,
-      srNo: idx + 1,
-      useCaseId: req.useCaseId,
-      requirementId: req.requirementId,
-      testCaseId: `TC_${String(idx + 1).padStart(3, '0')}`,
-      testCaseName: `Verify ${req.requirementTitle}`,
-      priority: req.priority,
-      type: req.type === 'Functional' ? 'Functional' as const : 'UI' as const,
-      precondition: 'System is running, test data is available',
-      postcondition: 'Expected state is achieved',
-      action: `Execute ${req.requirementTitle} workflow`,
-      expectedResult: `${req.requirementTitle} completes successfully`,
-    }));
-    
-    setTestCases(mockTestCases);
-    setIsProcessing(false);
-    setActiveTab('test-cases'); // Auto-switch to Test Cases tab
+    try {
+      // Transform selected requirements to the format expected by the API
+      const requirementsForApi = selectedRequirements.map(req => ({
+        requirement_id: req.requirementId,
+        use_case_id: req.useCaseId,
+        requirement_title: req.requirementTitle,
+        requirement_type: req.type,
+        description: req.description,
+        priority: req.priority,
+        status: req.status,
+      }));
+
+      // Get related use cases for the selected requirements
+      const relatedUseCaseIds = [...new Set(selectedRequirements.map(r => r.useCaseId))];
+      const relatedUseCases = useCases
+        .filter(uc => relatedUseCaseIds.includes(uc.useCaseId))
+        .map(uc => ({
+          use_case_id: uc.useCaseId,
+          use_case_name: uc.useCaseName,
+          description: uc.description,
+          actor: uc.actor,
+          stakeholders: uc.stakeholders,
+          priority: uc.priority,
+          pre_condition: uc.preCondition,
+          status: uc.status,
+        }));
+
+      const response = await fetch(SYS_ENGINEER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          action: 'generate_test_cases',
+          requirements: requirementsForApi,
+          useCases: relatedUseCases,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 429) {
+          toast.error('Rate limit exceeded. Please try again later.');
+        } else if (response.status === 402) {
+          toast.error('Payment required. Please add credits to continue.');
+        } else {
+          toast.error(errorData.error || 'Failed to generate test cases');
+        }
+        throw new Error(errorData.error || 'Failed to generate test cases');
+      }
+
+      const data = await response.json();
+      
+      // Transform API response to match our TestCase type
+      const generatedTestCases: TestCase[] = (data.test_cases || []).map((tc: {
+        test_case_id?: string;
+        use_case_id?: string;
+        requirement_id?: string;
+        test_case_name?: string;
+        priority?: string;
+        type?: string;
+        precondition?: string;
+        postcondition?: string;
+        action?: string;
+        expected_result?: string;
+      }, idx: number) => ({
+        id: String(idx + 1),
+        srNo: idx + 1,
+        useCaseId: tc.use_case_id || 'UC-001',
+        requirementId: tc.requirement_id || 'REQ-001',
+        testCaseId: tc.test_case_id || `TC-${String(idx + 1).padStart(3, '0')}`,
+        testCaseName: tc.test_case_name || `Test Case ${idx + 1}`,
+        priority: (tc.priority as 'Low' | 'Medium' | 'High') || 'Medium',
+        type: (tc.type as 'Functional' | 'UI' | 'Security') || 'Functional',
+        precondition: tc.precondition || '',
+        postcondition: tc.postcondition || '',
+        action: tc.action || '',
+        expectedResult: tc.expected_result || '',
+      }));
+
+      if (generatedTestCases.length === 0) {
+        toast.warning('No test cases could be generated from the selected requirements');
+      } else {
+        toast.success(`Generated ${generatedTestCases.length} test cases`);
+      }
+
+      setTestCases(generatedTestCases);
+      setActiveTab('test-cases'); // Auto-switch to Test Cases tab
+    } catch (error) {
+      console.error('Error generating test cases:', error);
+      setError(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleExport = (format: 'docx' | 'pdf' | 'xlsx' | 'txt') => {
-    // Placeholder for export functionality
     console.log(`Exporting as ${format}`);
   };
 
