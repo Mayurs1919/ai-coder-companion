@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/table';
 import { TestCase, Priority, TestCaseType } from '@/types/sysEngineer';
 import { cn } from '@/lib/utils';
+import { ExportDropdown } from './ExportDropdown';
+import { exportTestCasesToDocx, exportTestCasesToXlsx } from '@/lib/exportUtils';
 
 interface TestCaseTableProps {
   testCases: TestCase[];
@@ -103,7 +105,15 @@ export function TestCaseTable({ testCases }: TestCaseTableProps) {
   );
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <ExportDropdown
+          onExportDocx={() => exportTestCasesToDocx(testCases)}
+          onExportXlsx={() => exportTestCasesToXlsx(testCases)}
+          disabled={testCases.length === 0}
+        />
+      </div>
+      <div className="border rounded-lg overflow-hidden">
       <ScrollArea className="max-h-[500px]">
         <Table>
           <TableHeader className="bg-muted/40 sticky top-0">
@@ -196,6 +206,7 @@ export function TestCaseTable({ testCases }: TestCaseTableProps) {
           </TableBody>
         </Table>
       </ScrollArea>
+      </div>
     </div>
   );
 }
