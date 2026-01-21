@@ -1,7 +1,19 @@
 import { saveAs } from 'file-saver';
-import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, BorderStyle, HeadingLevel } from 'docx';
+import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, BorderStyle, HeadingLevel, AlignmentType } from 'docx';
 import * as XLSX from 'xlsx';
 import { UseCase, Requirement, TestCase } from '@/types/sysEngineer';
+
+// ============= Documentation Export Types =============
+
+export interface DocumentationFile {
+  filename: string;
+  content: string;
+}
+
+export interface DocumentationOutput {
+  files: Record<string, string>;
+  summary: string;
+}
 
 // ============= DOCX Export =============
 
@@ -272,4 +284,222 @@ export const exportTestCasesToXlsx = (testCases: TestCase[]) => {
   worksheet['!cols'] = colWidths;
 
   XLSX.writeFile(workbook, `test-cases-${Date.now()}.xlsx`);
+};
+
+// ============= Documentation Export =============
+
+/**
+ * Parse documentation content to extract sections
+ */
+const parseDocumentationSections = (content: string): { title: string; content: string }[] => {
+  const sections: { title: string; content: string }[] = [];
+  const lines = content.split('\n');
+  let currentSection = { title: '', content: '' };
+  
+  for (const line of lines) {
+    // Check for markdown headers (## or #)
+    const headerMatch = line.match(/^#+\s+(.+)/);
+    if (headerMatch) {
+      if (currentSection.title || currentSection.content.trim()) {
+        sections.push({ ...currentSection });
+      }
+      currentSection = { title: headerMatch[1], content: '' };
+    } else {
+      currentSection.content += line + '\n';
+    }
+  }
+  
+  if (currentSection.title || currentSection.content.trim()) {
+    sections.push(currentSection);
+  }
+  
+  return sections;
+};
+
+/**
+ * Export documentation files to DOCX format
+ */
+export const exportDocumentationToDocx = async (docs: DocumentationOutput) => {
+  const children: (Paragraph | Table)[] = [];
+  
+  // Add title
+  children.push(
+    new Paragraph({
+      text: 'Technical Documentation',
+      heading: HeadingLevel.TITLE,
+      spacing: { after: 400 },
+    })
+  );
+  
+  // Add generation date
+  children.push(
+    new Paragraph({
+      text: `Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`,
+      spacing: { after: 300 },
+    })
+  );
+  
+  // Add summary section
+  if (docs.summary) {
+    children.push(
+      new Paragraph({
+        text: 'Summary',
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 400, after: 200 },
+      })
+    );
+    children.push(
+      new Paragraph({
+        text: docs.summary,
+        spacing: { after: 400 },
+      })
+    );
+  }
+  
+  // Process each documentation file
+  const fileEntries = Object.entries(docs.files);
+  for (const [filename, content] of fileEntries) {
+    // Add file heading
+    children.push(
+      new Paragraph({
+        text: filename,
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 400, after: 200 },
+      })
+    );
+    
+    // Parse and add sections
+    const sections = parseDocumentationSections(content);
+    for (const section of sections) {
+      if (section.title) {
+        children.push(
+          new Paragraph({
+            text: section.title,
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 },
+          })
+        );
+      }
+      
+      // Split content into paragraphs and add code block handling
+      const contentLines = section.content.trim().split('\n');
+      let inCodeBlock = false;
+      let codeContent = '';
+      
+      for (const line of contentLines) {
+        if (line.startsWith('```')) {
+          if (inCodeBlock) {
+            // End code block
+            children.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: codeContent.trim(),
+                    font: 'Courier New',
+                    size: 20,
+                  }),
+                ],
+                shading: { fill: 'F3F4F6' },
+                spacing: { before: 100, after: 100 },
+              })
+            );
+            codeContent = '';
+            inCodeBlock = false;
+          } else {
+            inCodeBlock = true;
+          }
+        } else if (inCodeBlock) {
+          codeContent += line + '\n';
+        } else if (line.trim()) {
+          children.push(
+            new Paragraph({
+              text: line,
+              spacing: { after: 100 },
+            })
+          );
+        }
+      }
+    }
+  }
+  
+  const doc = new Document({
+    sections: [{ children }],
+  });
+  
+  const blob = await Packer.toBlob(doc);
+  saveAs(blob, `documentation-${Date.now()}.docx`);
+};
+
+/**
+ * Export documentation files to XLSX format
+ */
+export const exportDocumentationToXlsx = (docs: DocumentationOutput) => {
+  const workbook = XLSX.utils.book_new();
+  
+  // Create summary sheet
+  const summaryData = [
+    ['Documentation Export'],
+    ['Generated', new Date().toLocaleString()],
+    [''],
+    ['Summary'],
+    [docs.summary || 'No summary provided'],
+  ];
+  const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+  summarySheet['!cols'] = [{ wch: 80 }];
+  XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+  
+  // Create a sheet for each documentation file
+  const fileEntries = Object.entries(docs.files);
+  for (const [filename, content] of fileEntries) {
+    const sections = parseDocumentationSections(content);
+    
+    // Create rows for the sheet
+    const sheetData: string[][] = [[filename], ['']];
+    
+    for (const section of sections) {
+      if (section.title) {
+        sheetData.push([`## ${section.title}`]);
+      }
+      
+      const contentLines = section.content.trim().split('\n');
+      for (const line of contentLines) {
+        sheetData.push([line]);
+      }
+      sheetData.push(['']); // Empty row between sections
+    }
+    
+    const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+    worksheet['!cols'] = [{ wch: 100 }];
+    
+    // Clean filename for sheet name (max 31 chars, no special chars)
+    const sheetName = filename
+      .replace(/[\\/:*?[\]]/g, '_')
+      .substring(0, 31);
+    
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  }
+  
+  XLSX.writeFile(workbook, `documentation-${Date.now()}.xlsx`);
+};
+
+/**
+ * Parse JSON documentation output from agent response
+ */
+export const parseDocumentationOutput = (content: string): DocumentationOutput | null => {
+  try {
+    // Try to extract JSON from the content
+    const jsonMatch = content.match(/\{[\s\S]*"files"[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.files && typeof parsed.files === 'object') {
+        return {
+          files: parsed.files,
+          summary: parsed.summary || '',
+        };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
 };

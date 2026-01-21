@@ -1,12 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Loader2, Copy, Check, ArrowLeft, Maximize2, Download } from 'lucide-react';
+import { Send, Loader2, Copy, Check, ArrowLeft, Maximize2, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAgentStore } from '@/stores/agentStore';
 import { useConsoleStore } from '@/stores/consoleStore';
 import { useSessionUsageStore } from '@/stores/sessionUsageStore';
@@ -14,6 +20,12 @@ import { AGENTS, AgentId } from '@/types/agents';
 import { cn } from '@/lib/utils';
 import { FullscreenCodeViewer } from './FullscreenCodeViewer';
 import { AgentMetricsPanel } from './AgentMetricsPanel';
+import { 
+  parseDocumentationOutput, 
+  exportDocumentationToDocx, 
+  exportDocumentationToXlsx 
+} from '@/lib/exportUtils';
+import { toast } from 'sonner';
 import {
   Code2,
   Wand2,
@@ -21,11 +33,12 @@ import {
   FlaskConical,
   Play,
   GitPullRequest,
-  FileText,
   Network,
   Webhook,
   Boxes,
 } from 'lucide-react';
+
+const FileTextIcon = FileText;
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Code2,
@@ -34,7 +47,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   FlaskConical,
   Play,
   GitPullRequest,
-  FileText,
+  FileText: FileTextIcon,
   Network,
   Webhook,
   Boxes,
@@ -266,6 +279,48 @@ export function AgentWorkspace() {
     trackDownload(agentId as AgentId);
   };
 
+  // Get the last documentation output for export
+  const getLastDocumentationOutput = () => {
+    const assistantMessages = agentMessages.filter(m => m.role === 'assistant' && m.content);
+    if (assistantMessages.length === 0) return null;
+    
+    const lastMessage = assistantMessages[assistantMessages.length - 1];
+    return parseDocumentationOutput(lastMessage.content);
+  };
+
+  const handleExportDocsToDocx = async () => {
+    const docs = getLastDocumentationOutput();
+    if (!docs) {
+      toast.error('No documentation found to export');
+      return;
+    }
+    try {
+      await exportDocumentationToDocx(docs);
+      toast.success('Documentation exported to DOCX');
+      trackDownload(agentId as AgentId);
+    } catch (error) {
+      toast.error('Failed to export documentation');
+    }
+  };
+
+  const handleExportDocsToXlsx = () => {
+    const docs = getLastDocumentationOutput();
+    if (!docs) {
+      toast.error('No documentation found to export');
+      return;
+    }
+    try {
+      exportDocumentationToXlsx(docs);
+      toast.success('Documentation exported to XLSX');
+      trackDownload(agentId as AgentId);
+    } catch (error) {
+      toast.error('Failed to export documentation');
+    }
+  };
+
+  const isDocsAgent = agentId === 'docs';
+  const hasDocumentationOutput = isDocsAgent && getLastDocumentationOutput() !== null;
+
   const getFileExtension = (language: string): string => {
     const extensions: Record<string, string> = {
       javascript: 'js',
@@ -435,15 +490,42 @@ export function AgentWorkspace() {
             <h1 className="text-xl font-bold">{agent.name}</h1>
             <p className="text-sm text-muted-foreground">{agent.description}</p>
           </div>
-          <Badge
-            variant={agent.status === 'processing' ? 'default' : 'secondary'}
-            className={cn(
-              'ml-auto',
-              agent.status === 'processing' && 'animate-pulse'
+          <div className="ml-auto flex items-center gap-2">
+            {/* Export dropdown for Documentation Agent */}
+            {isDocsAgent && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={!hasDocumentationOutput}
+                    className="gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-popover">
+                  <DropdownMenuItem onClick={handleExportDocsToDocx} className="gap-2 cursor-pointer">
+                    <FileText className="h-4 w-4" />
+                    Export as DOCX
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportDocsToXlsx} className="gap-2 cursor-pointer">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Export as XLSX
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-          >
-            {agent.status === 'processing' ? 'Processing...' : 'Ready'}
-          </Badge>
+            <Badge
+              variant={agent.status === 'processing' ? 'default' : 'secondary'}
+              className={cn(
+                agent.status === 'processing' && 'animate-pulse'
+              )}
+            >
+              {agent.status === 'processing' ? 'Processing...' : 'Ready'}
+            </Badge>
+          </div>
         </div>
 
         {/* Chat Area */}
