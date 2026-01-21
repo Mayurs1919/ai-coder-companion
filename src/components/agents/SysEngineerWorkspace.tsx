@@ -102,23 +102,35 @@ export function SysEngineerWorkspace() {
         use_case_name?: string;
         description?: string;
         actor?: string;
-        stakeholders?: string[];
+        stakeholders?: string | string[];
         priority?: string;
         pre_condition?: string;
         status?: string;
-      }, idx: number) => ({
-        id: String(idx + 1),
-        srNo: idx + 1,
-        useCaseId: uc.use_case_id || `UC-${String(idx + 1).padStart(3, '0')}`,
-        useCaseName: uc.use_case_name || `Use Case ${idx + 1}`,
-        description: uc.description || '',
-        actor: uc.actor || 'User',
-        stakeholders: uc.stakeholders || ['Developers', 'DevOps', 'QA', 'PM', 'Security'],
-        priority: (uc.priority as 'Low' | 'Medium' | 'High') || 'Medium',
-        preCondition: uc.pre_condition || '',
-        status: 'Draft' as const,
-        selected: false,
-      }));
+      }, idx: number) => {
+        // Ensure stakeholders is always an array
+        let stakeholdersArray: string[] = [];
+        if (Array.isArray(uc.stakeholders)) {
+          stakeholdersArray = uc.stakeholders;
+        } else if (typeof uc.stakeholders === 'string') {
+          stakeholdersArray = uc.stakeholders.split(',').map(s => s.trim()).filter(Boolean);
+        } else {
+          stakeholdersArray = ['Developers', 'DevOps', 'QA', 'PM', 'Security'];
+        }
+
+        return {
+          id: String(idx + 1),
+          srNo: idx + 1,
+          useCaseId: uc.use_case_id || `UC-${String(idx + 1).padStart(3, '0')}`,
+          useCaseName: uc.use_case_name || `Use Case ${idx + 1}`,
+          description: uc.description || '',
+          actor: uc.actor || 'User',
+          stakeholders: stakeholdersArray,
+          priority: (uc.priority as 'Low' | 'Medium' | 'High') || 'Medium',
+          preCondition: uc.pre_condition || '',
+          status: 'Draft' as const,
+          selected: false,
+        };
+      });
 
       if (generatedUseCases.length === 0) {
         toast.warning('No use cases could be extracted from the document');

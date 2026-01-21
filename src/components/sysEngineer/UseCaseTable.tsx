@@ -205,8 +205,8 @@ export function UseCaseTable({ useCases, onToggleSelection, onSelectAll }: UseCa
                         </div>
                         <div className="col-span-2">
                           <span className="text-muted-foreground">Stakeholders:</span>
-                          <div className="flex gap-1 mt-1">
-                            {uc.stakeholders.map((s) => (
+                          <div className="flex gap-1 mt-1 flex-wrap">
+                            {(Array.isArray(uc.stakeholders) ? uc.stakeholders : []).map((s) => (
                               <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>
                             ))}
                           </div>
