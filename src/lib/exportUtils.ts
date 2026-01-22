@@ -1,6 +1,7 @@
 import { saveAs } from 'file-saver';
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, BorderStyle, HeadingLevel, AlignmentType } from 'docx';
 import * as XLSX from 'xlsx';
+import { jsonrepair } from 'jsonrepair';
 import { UseCase, Requirement, TestCase } from '@/types/sysEngineer';
 
 // ============= Documentation Export Types =============
@@ -498,6 +499,21 @@ export const parseDocumentationOutput = (content: string): DocumentationOutput |
       }
     } catch {
       // Not a direct JSON, continue to extract
+    }
+
+    // Try to repair almost-JSON (models occasionally output invalid JSON with stray quotes, etc.)
+    // jsonrepair fixes many common issues without us needing brittle regexes.
+    try {
+      const repaired = jsonrepair(content);
+      const parsed = JSON.parse(repaired);
+      if (parsed.files && typeof parsed.files === 'object') {
+        return {
+          files: parsed.files,
+          summary: parsed.summary || '',
+        };
+      }
+    } catch {
+      // Continue to extraction methods below
     }
 
     // Try to find JSON within code blocks (```json ... ```)
