@@ -487,17 +487,85 @@ export const exportDocumentationToXlsx = (docs: DocumentationOutput) => {
  */
 export const parseDocumentationOutput = (content: string): DocumentationOutput | null => {
   try {
-    // Try to extract JSON from the content
-    const jsonMatch = content.match(/\{[\s\S]*"files"[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (parsed.files && typeof parsed.files === 'object') {
+    // First, try to parse the entire content as JSON (if it's a pure JSON response)
+    try {
+      const directParse = JSON.parse(content);
+      if (directParse.files && typeof directParse.files === 'object') {
         return {
-          files: parsed.files,
-          summary: parsed.summary || '',
+          files: directParse.files,
+          summary: directParse.summary || '',
         };
       }
+    } catch {
+      // Not a direct JSON, continue to extract
     }
+
+    // Try to find JSON within code blocks (```json ... ```)
+    const codeBlockMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+    if (codeBlockMatch) {
+      try {
+        const parsed = JSON.parse(codeBlockMatch[1]);
+        if (parsed.files && typeof parsed.files === 'object') {
+          return {
+            files: parsed.files,
+            summary: parsed.summary || '',
+          };
+        }
+      } catch {
+        // Continue to next method
+      }
+    }
+
+    // Try to extract JSON object with "files" key from anywhere in the content
+    // Use a more careful approach to find balanced braces
+    const filesIndex = content.indexOf('"files"');
+    if (filesIndex !== -1) {
+      // Find the opening brace before "files"
+      let startIndex = filesIndex;
+      while (startIndex > 0 && content[startIndex] !== '{') {
+        startIndex--;
+      }
+      
+      if (content[startIndex] === '{') {
+        // Find matching closing brace
+        let braceCount = 0;
+        let endIndex = startIndex;
+        for (let i = startIndex; i < content.length; i++) {
+          if (content[i] === '{') braceCount++;
+          if (content[i] === '}') braceCount--;
+          if (braceCount === 0) {
+            endIndex = i + 1;
+            break;
+          }
+        }
+        
+        const jsonStr = content.substring(startIndex, endIndex);
+        try {
+          const parsed = JSON.parse(jsonStr);
+          if (parsed.files && typeof parsed.files === 'object') {
+            return {
+              files: parsed.files,
+              summary: parsed.summary || '',
+            };
+          }
+        } catch {
+          // JSON parse failed
+        }
+      }
+    }
+
+    // Fallback: If no structured JSON found, try to create documentation from markdown content
+    // This handles cases where the agent responds with plain markdown instead of JSON
+    if (content.length > 100 && !content.includes('"files"')) {
+      // Create a single file from the markdown content
+      return {
+        files: {
+          'documentation.md': content,
+        },
+        summary: 'Generated documentation',
+      };
+    }
+
     return null;
   } catch {
     return null;
