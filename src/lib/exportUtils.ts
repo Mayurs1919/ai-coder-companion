@@ -16,6 +16,38 @@ export interface DocumentationOutput {
   summary: string;
 }
 
+// ============= Documentation Parsing Helpers =============
+
+const normalizeDocumentationOutput = (parsed: any): DocumentationOutput | null => {
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  const summary = typeof parsed.summary === 'string' ? parsed.summary : '';
+  const files = parsed.files;
+
+  // Expected contract: files is an object mapping filename -> content.
+  if (files && typeof files === 'object' && !Array.isArray(files)) {
+    // Ensure all values are strings (best-effort).
+    const normalized: Record<string, string> = {};
+    for (const [k, v] of Object.entries(files)) {
+      if (typeof v === 'string') normalized[String(k)] = v;
+      else if (v != null) normalized[String(k)] = JSON.stringify(v, null, 2);
+    }
+    return Object.keys(normalized).length
+      ? { files: normalized, summary }
+      : null;
+  }
+
+  // Common model failure mode: files is a single markdown string.
+  if (typeof files === 'string' && files.trim().length > 0) {
+    return {
+      files: { 'documentation.md': files },
+      summary,
+    };
+  }
+
+  return null;
+};
+
 // ============= DOCX Export =============
 
 const createTableCell = (text: string, isHeader = false): TableCell => {
@@ -491,12 +523,8 @@ export const parseDocumentationOutput = (content: string): DocumentationOutput |
     // First, try to parse the entire content as JSON (if it's a pure JSON response)
     try {
       const directParse = JSON.parse(content);
-      if (directParse.files && typeof directParse.files === 'object') {
-        return {
-          files: directParse.files,
-          summary: directParse.summary || '',
-        };
-      }
+      const normalized = normalizeDocumentationOutput(directParse);
+      if (normalized) return normalized;
     } catch {
       // Not a direct JSON, continue to extract
     }
@@ -506,12 +534,8 @@ export const parseDocumentationOutput = (content: string): DocumentationOutput |
     try {
       const repaired = jsonrepair(content);
       const parsed = JSON.parse(repaired);
-      if (parsed.files && typeof parsed.files === 'object') {
-        return {
-          files: parsed.files,
-          summary: parsed.summary || '',
-        };
-      }
+      const normalized = normalizeDocumentationOutput(parsed);
+      if (normalized) return normalized;
     } catch {
       // Continue to extraction methods below
     }
@@ -521,12 +545,8 @@ export const parseDocumentationOutput = (content: string): DocumentationOutput |
     if (codeBlockMatch) {
       try {
         const parsed = JSON.parse(codeBlockMatch[1]);
-        if (parsed.files && typeof parsed.files === 'object') {
-          return {
-            files: parsed.files,
-            summary: parsed.summary || '',
-          };
-        }
+        const normalized = normalizeDocumentationOutput(parsed);
+        if (normalized) return normalized;
       } catch {
         // Continue to next method
       }
@@ -558,12 +578,8 @@ export const parseDocumentationOutput = (content: string): DocumentationOutput |
         const jsonStr = content.substring(startIndex, endIndex);
         try {
           const parsed = JSON.parse(jsonStr);
-          if (parsed.files && typeof parsed.files === 'object') {
-            return {
-              files: parsed.files,
-              summary: parsed.summary || '',
-            };
-          }
+          const normalized = normalizeDocumentationOutput(parsed);
+          if (normalized) return normalized;
         } catch {
           // JSON parse failed
         }
