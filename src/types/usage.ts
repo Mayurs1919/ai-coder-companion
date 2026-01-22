@@ -106,9 +106,22 @@ export interface AuditEntry {
   timestamp: string;
 }
 
+// PR Review Analytics (integrated with usage tracking)
+export interface PRReviewUsageMetrics {
+  totalReviews: number;
+  avgIssuesPerPR: number;
+  securityIssuesFound: number;
+  repeatedViolations: Record<string, number>;
+  improvementRate: number;
+  avgQualityScore: number;
+  blockerRate: number;
+  reviewsByMode: Record<string, number>;
+}
+
 export interface GovernanceState {
   config: GovernanceConfig;
   currentUsage: { daily: number; monthly: number; cost: number };
   alerts: UsageAlert[];
   auditTrail: AuditEntry[];
+  prReviewMetrics?: PRReviewUsageMetrics;
 }

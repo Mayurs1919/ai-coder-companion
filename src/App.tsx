@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Dashboard } from "@/components/dashboard/Dashboard";
 import { AgentWorkspace } from "@/components/agents/AgentWorkspace";
+import { PRReviewerWorkspace } from "@/components/agents/PRReviewerWorkspace";
 import { MicroservicesWorkspace } from "@/components/agents/MicroservicesWorkspace";
 import { SysEngineerWorkspace } from "@/components/agents/SysEngineerWorkspace";
 import { UsageSection } from "@/components/usage/UsageSection";
@@ -68,6 +69,16 @@ const App = () => (
                 <ProtectedRoute>
                   <AppLayout>
                     <SysEngineerWorkspace />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/agent/reviewer"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <PRReviewerWorkspace />
                   </AppLayout>
                 </ProtectedRoute>
               }
