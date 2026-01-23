@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -23,7 +23,8 @@ import {
   Paintbrush,
   Boxes,
   Brain,
-  FileText
+  FileText,
+  Upload
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -33,6 +34,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAgentStore } from '@/stores/agentStore';
 import { useConsoleStore } from '@/stores/consoleStore';
 import { useSessionUsageStore } from '@/stores/sessionUsageStore';
@@ -45,6 +47,7 @@ import {
 } from '@/types/prReview';
 import { cn } from '@/lib/utils';
 import { AgentMetricsPanel } from './AgentMetricsPanel';
+import { PRFileUploadSection, UploadedPRFile } from './PRFileUploadSection';
 import { toast } from 'sonner';
 import { jsonrepair } from 'jsonrepair';
 
@@ -83,6 +86,8 @@ export function PRReviewerWorkspace() {
   const navigate = useNavigate();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedPRFile[]>([]);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const requestStartTime = useRef<number>(0);
   
@@ -117,6 +122,38 @@ export function PRReviewerWorkspace() {
     setReviewMode(mode);
     toast.success(`Review mode set to ${REVIEW_MODES[mode].name}`);
   };
+
+  // File upload handlers
+  const handleFilesUpload = useCallback((files: UploadedPRFile[]) => {
+    setUploadedFiles(prev => [...prev, ...files]);
+    toast.success(`${files.length} file(s) uploaded`);
+  }, []);
+
+  const handleFileRemove = useCallback((fileId: string) => {
+    setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+  }, []);
+
+  const handleClearAllFiles = useCallback(() => {
+    setUploadedFiles([]);
+    toast.info('All files cleared');
+  }, []);
+
+  // Build review content from uploaded files
+  const buildFileContent = useCallback(() => {
+    if (uploadedFiles.length === 0) return '';
+    
+    return uploadedFiles.map(file => {
+      return `--- File: ${file.path || file.name} ---\n${file.content}`;
+    }).join('\n\n');
+  }, [uploadedFiles]);
+
+  const handleUseUploadedFiles = useCallback(() => {
+    const content = buildFileContent();
+    if (content) {
+      setInput(prev => prev ? `${prev}\n\n${content}` : content);
+      toast.success('File contents added to review input');
+    }
+  }, [buildFileContent]);
 
   const parseReviewResult = (content: string): PRReviewResult | null => {
     try {
@@ -705,12 +742,49 @@ Analyze the following code/diff and provide a comprehensive PR review:
         </ScrollArea>
 
         {/* Input Area */}
-        <div className="border-t pt-4">
+        <div className="border-t pt-4 space-y-3">
+          {/* File Upload Collapsible */}
+          <Collapsible open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+            <div className="flex items-center gap-2">
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Upload className="w-4 h-4" />
+                  Upload Files
+                  {uploadedFiles.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">
+                      {uploadedFiles.length}
+                    </Badge>
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              {uploadedFiles.length > 0 && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleUseUploadedFiles}
+                  className="text-xs"
+                >
+                  Add to review input
+                </Button>
+              )}
+            </div>
+            <CollapsibleContent className="mt-3">
+              <PRFileUploadSection
+                uploadedFiles={uploadedFiles}
+                onFilesUpload={handleFilesUpload}
+                onFileRemove={handleFileRemove}
+                onClearAll={handleClearAllFiles}
+                disabled={isLoading}
+              />
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Text Input */}
           <div className="flex gap-2">
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Paste your code diff or file contents here..."
+              placeholder="Paste your code diff or file contents here, or upload files above..."
               className="resize-none min-h-[100px]"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -720,7 +794,7 @@ Analyze the following code/diff and provide a comprehensive PR review:
               }}
             />
           </div>
-          <div className="flex justify-between items-center mt-2">
+          <div className="flex justify-between items-center">
             <div className="text-xs text-muted-foreground">
               Press Enter to submit, Shift+Enter for new line
             </div>
