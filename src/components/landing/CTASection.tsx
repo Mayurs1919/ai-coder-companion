@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ArrowRight, Zap } from 'lucide-react';
+import { ArrowRight, Zap, GitBranch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -7,26 +7,18 @@ export function CTASection() {
   const navigate = useNavigate();
 
   return (
-    <section className="py-24 relative overflow-hidden">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/10" />
+    <section className="py-24 relative overflow-hidden bg-muted/10">
+      {/* Gradient accent */}
+      <div className="absolute inset-0 bg-gradient-to-t from-primary/10 via-transparent to-transparent" />
       
-      {/* Animated orbs */}
-      <motion.div
-        className="absolute top-1/2 left-1/4 w-64 h-64 rounded-full bg-primary/10 blur-3xl"
-        animate={{
-          scale: [1, 1.3, 1],
-          opacity: [0.2, 0.4, 0.2],
+      {/* Grid pattern */}
+      <div 
+        className="absolute inset-0 opacity-[0.02]"
+        style={{
+          backgroundImage: `linear-gradient(hsl(var(--primary)) 1px, transparent 1px),
+                           linear-gradient(90deg, hsl(var(--primary)) 1px, transparent 1px)`,
+          backgroundSize: '40px 40px'
         }}
-        transition={{ duration: 6, repeat: Infinity }}
-      />
-      <motion.div
-        className="absolute top-1/2 right-1/4 w-48 h-48 rounded-full bg-accent/10 blur-3xl"
-        animate={{
-          scale: [1.2, 1, 1.2],
-          opacity: [0.3, 0.1, 0.3],
-        }}
-        transition={{ duration: 5, repeat: Infinity }}
       />
 
       <div className="container mx-auto px-6 relative z-10">
@@ -38,57 +30,38 @@ export function CTASection() {
           className="max-w-3xl mx-auto text-center"
         >
           {/* Headline */}
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            <span className="text-foreground">Ready to Engineer with</span>
-            <br />
-            <span className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-              AI That Understands Code?
-            </span>
+          <h2 className="text-3xl md:text-5xl font-bold mb-6 text-foreground">
+            There's Nothing You Can't Automate
           </h2>
 
           {/* Subtext */}
-          <p className="text-xl text-muted-foreground mb-10">
-            Stop prompting. Start building.{' '}
-            <span className="text-foreground">AI Code Agent</span> gives you the engineering partner you've been waiting for.
+          <p className="text-lg text-muted-foreground mb-10 leading-relaxed">
+            From code generation to architecture design — orchestrate intelligent engineering workflows at scale.
           </p>
 
-          {/* CTA Button */}
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Button
+                size="lg"
+                className="text-base px-8 py-6 bg-primary hover:bg-primary/90 group font-medium"
+                onClick={() => navigate('/auth')}
+              >
+                <Zap className="w-5 h-5 mr-2" />
+                Start Building
+                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </motion.div>
             <Button
               size="lg"
-              className="text-xl px-10 py-7 bg-gradient-to-r from-primary to-accent hover:opacity-90 group shadow-lg shadow-primary/25"
-              onClick={() => navigate('/auth')}
+              variant="outline"
+              className="text-base px-8 py-6 border-border hover:bg-card hover:border-primary/50 font-medium"
+              onClick={() => document.getElementById('architecture')?.scrollIntoView({ behavior: 'smooth' })}
             >
-              <Zap className="w-6 h-6 mr-2" />
-              Launch Workspace
-              <ArrowRight className="w-6 h-6 ml-2 group-hover:translate-x-1 transition-transform" />
+              <GitBranch className="w-5 h-5 mr-2" />
+              View Architecture
             </Button>
-          </motion.div>
-
-          {/* Trust indicators */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.3 }}
-            className="mt-12 flex items-center justify-center gap-8 text-sm text-muted-foreground"
-          >
-            <span className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              No credit card required
-            </span>
-            <span className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              Instant access
-            </span>
-            <span className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              Production-ready output
-            </span>
-          </motion.div>
+          </div>
         </motion.div>
       </div>
     </section>
