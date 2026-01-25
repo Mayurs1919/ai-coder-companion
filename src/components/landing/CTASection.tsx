@@ -45,10 +45,10 @@ export function CTASection() {
               <Button
                 size="lg"
                 className="text-base px-8 py-6 bg-primary hover:bg-primary/90 group font-medium"
-                onClick={() => navigate('/auth')}
+                onClick={() => navigate('/execute')}
               >
                 <Zap className="w-5 h-5 mr-2" />
-                Start Building
+                Launch IDE Engine
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </motion.div>

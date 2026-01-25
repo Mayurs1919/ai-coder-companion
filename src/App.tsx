@@ -13,6 +13,7 @@ import { PRReviewerWorkspace } from "@/components/agents/PRReviewerWorkspace";
 import { MicroservicesWorkspace } from "@/components/agents/MicroservicesWorkspace";
 import { SysEngineerWorkspace } from "@/components/agents/SysEngineerWorkspace";
 import { UsageSection } from "@/components/usage/UsageSection";
+import { ExecutionSurface } from "@/components/execution/ExecutionSurface";
 import { LandingPage } from "@/components/landing/LandingPage";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -31,6 +32,16 @@ const App = () => (
             {/* Public landing page */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<Auth />} />
+            
+            {/* AI IDE Execution Surface - Main Interface */}
+            <Route
+              path="/execute"
+              element={
+                <ProtectedRoute>
+                  <ExecutionSurface />
+                </ProtectedRoute>
+              }
+            />
             
             {/* Protected dashboard */}
             <Route
