@@ -393,11 +393,10 @@ export function ExecutionSurface() {
           {currentArtifacts.length === 0 && executionState === 'idle' && (
             <div className="text-center mb-8 animate-fade-in">
               <h1 className="text-3xl font-bold tracking-tight mb-3">
-                Execute Engineering Commands
+                AI IDE Engine
               </h1>
               <p className="text-muted-foreground max-w-lg mx-auto">
-                Enter a prompt to generate code, documentation, reviews, or system designs.
-                The engine handles routing and execution automatically.
+                Describe what you want to build. The engine handles the rest.
               </p>
             </div>
           )}

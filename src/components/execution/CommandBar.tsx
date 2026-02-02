@@ -7,10 +7,12 @@ import {
   X, 
   FileCode, 
   FileText,
-  ChevronUp,
   Sparkles,
-  Command,
-  CornerDownLeft
+  Terminal,
+  Code2,
+  FileSearch,
+  GitPullRequest,
+  Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -28,22 +30,18 @@ interface CommandBarProps {
   placeholder?: string;
 }
 
-const EXAMPLE_PROMPTS = [
-  "Write a Python Fibonacci program",
-  "Generate test cases for API v2 authentication",
-  "Review PR #245 for risky deletions",
-  "Extract use cases from this document",
-  "Design a scalable microservices architecture",
-  "Refactor this code for better performance",
-  "Generate API documentation for this endpoint",
-  "Analyze security vulnerabilities in this code"
+// Quick action chips for common tasks
+const QUICK_ACTIONS = [
+  { icon: Code2, label: 'Generate Code', prompt: 'Write a ' },
+  { icon: GitPullRequest, label: 'Review', prompt: 'Review this code for ' },
+  { icon: FileSearch, label: 'Analyze', prompt: 'Analyze ' },
+  { icon: Shield, label: 'Security', prompt: 'Check security vulnerabilities in ' },
 ];
 
 export function CommandBar({ onExecute, isProcessing, placeholder }: CommandBarProps) {
   const [input, setInput] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [isFocused, setIsFocused] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -68,7 +66,6 @@ export function CommandBar({ onExecute, isProcessing, placeholder }: CommandBarP
         onExecute(input.trim(), attachedFiles);
         setInput('');
         setAttachedFiles([]);
-        setShowSuggestions(false);
       }
     }
   }, [input, attachedFiles, isProcessing, onExecute]);
@@ -93,9 +90,8 @@ export function CommandBar({ onExecute, isProcessing, placeholder }: CommandBarP
     setAttachedFiles(prev => prev.filter(f => f.id !== id));
   };
 
-  const selectSuggestion = (suggestion: string) => {
-    setInput(suggestion);
-    setShowSuggestions(false);
+  const handleQuickAction = (prompt: string) => {
+    setInput(prompt);
     textareaRef.current?.focus();
   };
 
@@ -108,7 +104,32 @@ export function CommandBar({ onExecute, isProcessing, placeholder }: CommandBarP
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto space-y-4">
+      {/* Quick Actions - Only show when empty and focused */}
+      {!input && isFocused && (
+        <div className="flex items-center justify-center gap-2 animate-fade-in">
+          {QUICK_ACTIONS.map((action, index) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={index}
+                onClick={() => handleQuickAction(action.prompt)}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-xl',
+                  'border border-border/50 bg-card/50 backdrop-blur-sm',
+                  'text-sm text-muted-foreground hover:text-foreground',
+                  'hover:border-primary/50 hover:bg-primary/5',
+                  'transition-all duration-200'
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{action.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Command Bar Container */}
       <div
         className={cn(
@@ -151,7 +172,7 @@ export function CommandBar({ onExecute, isProcessing, placeholder }: CommandBarP
 
         {/* Input Area */}
         <div className="flex items-end gap-3 p-4 relative z-10">
-          {/* Rocket Icon */}
+          {/* Terminal Icon */}
           <div className="flex-shrink-0 pb-1">
             <div className={cn(
               'w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300',
@@ -159,7 +180,7 @@ export function CommandBar({ onExecute, isProcessing, placeholder }: CommandBarP
                 ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30' 
                 : 'bg-muted text-muted-foreground'
             )}>
-              <Rocket className="w-5 h-5" />
+              <Terminal className="w-5 h-5" />
             </div>
           </div>
 
@@ -170,21 +191,14 @@ export function CommandBar({ onExecute, isProcessing, placeholder }: CommandBarP
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              onFocus={() => {
-                setIsFocused(true);
-                if (!input) setShowSuggestions(true);
-              }}
-              onBlur={() => {
-                setIsFocused(false);
-                // Delay hiding suggestions to allow click
-                setTimeout(() => setShowSuggestions(false), 200);
-              }}
-              placeholder={placeholder || "Enter an engineering command..."}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setTimeout(() => setIsFocused(false), 150)}
+              placeholder={placeholder || "What would you like to build?"}
               className={cn(
                 'w-full bg-transparent resize-none outline-none',
                 'text-foreground placeholder:text-muted-foreground/60',
                 'min-h-[24px] max-h-[200px] py-2',
-                'font-mono text-sm leading-relaxed'
+                'text-sm leading-relaxed'
               )}
               rows={1}
               disabled={isProcessing}
@@ -231,7 +245,6 @@ export function CommandBar({ onExecute, isProcessing, placeholder }: CommandBarP
                   onExecute(input.trim(), attachedFiles);
                   setInput('');
                   setAttachedFiles([]);
-                  setShowSuggestions(false);
                 }
               }}
               disabled={!input.trim() || isProcessing}
@@ -239,12 +252,12 @@ export function CommandBar({ onExecute, isProcessing, placeholder }: CommandBarP
               {isProcessing ? (
                 <>
                   <Sparkles className="w-4 h-4 animate-pulse" />
-                  <span>Executing...</span>
+                  <span>Processing...</span>
                 </>
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  <span>Execute</span>
+                  <span>Run</span>
                 </>
               )}
             </Button>
@@ -255,7 +268,7 @@ export function CommandBar({ onExecute, isProcessing, placeholder }: CommandBarP
         <div className="absolute bottom-1 right-4 flex items-center gap-3 text-[10px] text-muted-foreground/50 pointer-events-none">
           <span className="flex items-center gap-1">
             <kbd className="px-1 py-0.5 rounded bg-muted/50 font-mono">↵</kbd>
-            Execute
+            Run
           </span>
           <span className="flex items-center gap-1">
             <kbd className="px-1 py-0.5 rounded bg-muted/50 font-mono">⇧↵</kbd>
@@ -263,30 +276,6 @@ export function CommandBar({ onExecute, isProcessing, placeholder }: CommandBarP
           </span>
         </div>
       </div>
-
-      {/* Suggestions Dropdown */}
-      {showSuggestions && !input && (
-        <div className="mt-2 p-2 rounded-xl border border-border/50 bg-card/95 backdrop-blur-lg shadow-xl">
-          <div className="px-3 py-2 text-[10px] font-semibold tracking-wider text-muted-foreground/70 uppercase">
-            Example Commands
-          </div>
-          <div className="space-y-0.5">
-            {EXAMPLE_PROMPTS.map((prompt, index) => (
-              <button
-                key={index}
-                onClick={() => selectSuggestion(prompt)}
-                className={cn(
-                  'w-full px-3 py-2.5 text-left text-sm rounded-lg transition-colors',
-                  'hover:bg-muted/50 text-foreground/80 hover:text-foreground',
-                  'font-mono'
-                )}
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
