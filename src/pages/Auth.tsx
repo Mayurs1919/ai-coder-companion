@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,7 +17,10 @@ import {
   Loader2,
   Bot,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  ArrowLeft,
+  Terminal,
+  Cpu
 } from 'lucide-react';
 
 const authSchema = z.object({
@@ -34,7 +37,11 @@ export default function Auth() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const { signIn, signUp, signInWithGoogle, user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+
+  // Get the intended destination from location state, default to /execute
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/execute';
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<AuthFormData>({
     resolver: zodResolver(authSchema),
@@ -43,9 +50,9 @@ export default function Auth() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!loading && user) {
-      navigate('/dashboard');
+      navigate(from, { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, from]);
 
   const onSubmit = async (data: AuthFormData) => {
     setIsSubmitting(true);
@@ -64,9 +71,9 @@ export default function Auth() {
         } else {
           toast({
             title: "Welcome back!",
-            description: "You've been logged in successfully.",
+            description: "Launching IDE Engine...",
           });
-          navigate('/dashboard');
+          navigate(from, { replace: true });
         }
       } else {
         const { error } = await signUp(data.email, data.password);
@@ -87,9 +94,10 @@ export default function Auth() {
         } else {
           toast({
             title: "Account created!",
-            description: "Welcome to AI Code Agent.",
+            description: "Please check your email to verify your account.",
           });
-          navigate('/dashboard');
+          // Don't navigate immediately - wait for email verification
+          setIsLogin(true);
         }
       }
     } finally {
@@ -115,6 +123,10 @@ export default function Auth() {
     reset();
   };
 
+  const handleBack = () => {
+    navigate('/');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -125,14 +137,32 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex relative overflow-hidden bg-gradient-to-br from-background via-background to-muted/20">
+      {/* Back Button - Top Left */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleBack}
+        className="absolute top-6 left-6 z-20 gap-2 text-muted-foreground hover:text-foreground hover:bg-card/50"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Home
+      </Button>
+
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-agent-writer/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-agent-debug/10 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-console-success/10 rounded-full blur-3xl animate-pulse delay-1000" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl" />
         
         {/* Grid pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px]" />
+        <div 
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `linear-gradient(hsl(var(--primary) / 0.3) 1px, transparent 1px),
+                             linear-gradient(90deg, hsl(var(--primary) / 0.3) 1px, transparent 1px)`,
+            backgroundSize: '60px 60px'
+          }}
+        />
       </div>
 
       {/* Left side - Branding */}
@@ -140,21 +170,21 @@ export default function Auth() {
         <div className="max-w-md text-center space-y-8">
           <div className="flex items-center justify-center gap-3 mb-8">
             <div className="p-3 rounded-xl bg-primary/20 backdrop-blur-sm border border-primary/30">
-              <Code2 className="h-10 w-10 text-primary" />
+              <Terminal className="h-10 w-10 text-primary" />
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-agent-writer to-agent-refactor bg-clip-text text-transparent">
-              AI Code Viewer
+            <h1 className="text-4xl font-bold text-foreground">
+              AI IDE Engine
             </h1>
           </div>
           
           <p className="text-xl text-muted-foreground leading-relaxed">
-            Your intelligent coding companion powered by 10 specialized AI agents.
+            Command-driven AI workflow automation for engineering teams.
           </p>
 
           <div className="grid grid-cols-2 gap-4 mt-12">
             {[
-              { icon: Bot, label: "Code Writer", color: "text-agent-writer" },
-              { icon: Sparkles, label: "Bug Fixer", color: "text-agent-debug" },
+              { icon: Cpu, label: "Agent Kernel", color: "text-primary" },
+              { icon: Bot, label: "Multi-Agent", color: "text-console-success" },
             ].map((item, i) => (
               <div 
                 key={i}
@@ -180,16 +210,16 @@ export default function Auth() {
               {/* Header */}
               <div className="text-center mb-8">
                 <div className="lg:hidden flex items-center justify-center gap-2 mb-4">
-                  <Code2 className="h-6 w-6 text-primary" />
-                  <span className="text-xl font-bold">AI Code Viewer</span>
+                  <Terminal className="h-6 w-6 text-primary" />
+                  <span className="text-xl font-bold">AI IDE Engine</span>
                 </div>
                 <h2 className="text-2xl font-bold">
-                  {isLogin ? 'Welcome back' : 'Create account'}
+                  {isLogin ? 'Sign In' : 'Create Account'}
                 </h2>
                 <p className="text-muted-foreground mt-2">
                   {isLogin 
-                    ? 'Sign in to access your AI agents' 
-                    : 'Get started with your coding journey'}
+                    ? 'Access your AI IDE Engine' 
+                    : 'Start automating engineering workflows'}
                 </p>
               </div>
 
@@ -284,14 +314,14 @@ export default function Auth() {
 
                 <Button
                   type="submit"
-                  className="w-full h-12 mt-6 gap-2 bg-gradient-to-r from-primary to-agent-writer hover:opacity-90 transition-opacity"
+                  className="w-full h-12 mt-6 gap-2 bg-primary hover:bg-primary/90 transition-colors"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <>
-                      {isLogin ? 'Sign in' : 'Create account'}
+                      {isLogin ? 'Sign In' : 'Create Account'}
                       <ArrowRight className="h-4 w-4" />
                     </>
                   )}
