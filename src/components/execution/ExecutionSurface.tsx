@@ -72,102 +72,200 @@ export function ExecutionSurface() {
     }
   }, [currentArtifacts]);
 
-  // Parse response into artifacts
+  // Parse response into artifacts based on the detected intent
   const parseResponse = useCallback((content: string, intent: string): Artifact[] => {
     const artifacts: Artifact[] = [];
     
-    // Extract code blocks
+    // Extract code blocks from content
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
     let match;
-    let hasCode = false;
+    const codeBlocks: { language: string; code: string }[] = [];
 
     while ((match = codeBlockRegex.exec(content)) !== null) {
-      hasCode = true;
-      const language = match[1] || 'plaintext';
-      const code = match[2].trim();
-      
-      artifacts.push({
-        id: crypto.randomUUID(),
-        type: 'code',
-        data: {
-          code,
-          language,
-          filename: detectFilename(code, language)
-        },
-        timestamp: new Date()
+      codeBlocks.push({
+        language: match[1] || 'plaintext',
+        code: match[2].trim()
       });
     }
 
-    // If no code blocks but intent suggests code, treat whole response as code
-    if (!hasCode && (intent === 'code' || intent === 'refactor' || intent === 'debug')) {
-      const cleanContent = content.replace(/^[\s\S]*?(?=(?:def |class |function |const |let |var |import |#include |package ))/m, '').trim();
-      if (cleanContent) {
-        artifacts.push({
-          id: crypto.randomUUID(),
-          type: 'code',
-          data: {
-            code: cleanContent,
-            language: detectLanguage(cleanContent),
-            filename: null
-          },
-          timestamp: new Date()
-        });
-      }
-    }
+    // Strip code blocks from content to get prose/structured text
+    const proseContent = content.replace(/```(\w+)?\n[\s\S]*?```/g, '').trim();
 
-    // For documentation intent
-    if (intent === 'documentation' && !hasCode) {
-      const sections = parseDocumentSections(content);
-      if (sections.length > 0) {
+    // Route to the correct artifact type based on intent
+    switch (intent) {
+      case 'code':
+      case 'refactor': {
+        // Code-producing agents: render code blocks as CodeArtifacts
+        if (codeBlocks.length > 0) {
+          for (const block of codeBlocks) {
+            artifacts.push({
+              id: crypto.randomUUID(),
+              type: 'code',
+              data: { code: block.code, language: block.language, filename: detectFilename(block.code, block.language) },
+              timestamp: new Date()
+            });
+          }
+        } else {
+          // Fallback: treat entire response as code
+          artifacts.push({
+            id: crypto.randomUUID(),
+            type: 'code',
+            data: { code: content, language: detectLanguage(content), filename: null },
+            timestamp: new Date()
+          });
+        }
+        // If refactor agent included a "Changes:" section, add as document
+        if (intent === 'refactor' && proseContent) {
+          artifacts.push({
+            id: crypto.randomUUID(),
+            type: 'document',
+            data: { title: 'Refactoring Summary', sections: parseDocumentSections(proseContent) },
+            timestamp: new Date()
+          });
+        }
+        break;
+      }
+
+      case 'debug': {
+        // Bug finder: structured diagnostic report as document, with inline code fixes
+        const sections = parseDocumentSections(content);
         artifacts.push({
           id: crypto.randomUUID(),
           type: 'document',
-          data: {
-            title: 'Generated Documentation',
-            sections
-          },
+          data: { title: 'Diagnostic Report', sections: sections.length > 0 ? sections : [{ title: 'Analysis', content }] },
           timestamp: new Date()
         });
+        // Also extract any fix code blocks
+        for (const block of codeBlocks) {
+          artifacts.push({
+            id: crypto.randomUUID(),
+            type: 'code',
+            data: { code: block.code, language: block.language, filename: detectFilename(block.code, block.language) },
+            timestamp: new Date()
+          });
+        }
+        break;
       }
-    }
 
-    // For review intent, parse as diff
-    if (intent === 'review') {
-      const diffData = parseDiffContent(content);
-      if (diffData) {
+      case 'review': {
+        // PR Reviewer: structured review report as document + table for issues
+        const sections = parseDocumentSections(content);
         artifacts.push({
           id: crypto.randomUUID(),
-          type: 'diff',
-          data: diffData,
+          type: 'document',
+          data: { title: 'Review Report', sections: sections.length > 0 ? sections : [{ title: 'Review', content }] },
           timestamp: new Date()
         });
+        // Extract any tables from the review
+        const tableData = parseTableContent(content);
+        if (tableData) {
+          artifacts.push({
+            id: crypto.randomUUID(),
+            type: 'table',
+            data: tableData,
+            timestamp: new Date()
+          });
+        }
+        break;
       }
-    }
 
-    // For system/architecture intent, parse tables
-    if (intent === 'architecture' || intent === 'analysis') {
-      const tableData = parseTableContent(content);
-      if (tableData) {
+      case 'documentation': {
+        // Documentation agent: always document artifact
+        const sections = parseDocumentSections(content);
         artifacts.push({
           id: crypto.randomUUID(),
-          type: 'table',
-          data: tableData,
+          type: 'document',
+          data: { title: 'Documentation', sections: sections.length > 0 ? sections : [{ title: 'Content', content }] },
           timestamp: new Date()
         });
+        // Include any code examples as separate artifacts
+        for (const block of codeBlocks) {
+          artifacts.push({
+            id: crypto.randomUUID(),
+            type: 'code',
+            data: { code: block.code, language: block.language, filename: detectFilename(block.code, block.language) },
+            timestamp: new Date()
+          });
+        }
+        break;
       }
-    }
 
-    // Fallback: if no artifacts, create a document
-    if (artifacts.length === 0) {
-      artifacts.push({
-        id: crypto.randomUUID(),
-        type: 'document',
-        data: {
-          title: 'Response',
-          sections: [{ title: 'Output', content }]
-        },
-        timestamp: new Date()
-      });
+      case 'architecture': {
+        // Architecture agent: document + tables
+        const sections = parseDocumentSections(content);
+        artifacts.push({
+          id: crypto.randomUUID(),
+          type: 'document',
+          data: { title: 'Architecture Design', sections: sections.length > 0 ? sections : [{ title: 'Design', content }] },
+          timestamp: new Date()
+        });
+        const tableData = parseTableContent(content);
+        if (tableData) {
+          artifacts.push({
+            id: crypto.randomUUID(),
+            type: 'table',
+            data: tableData,
+            timestamp: new Date()
+          });
+        }
+        break;
+      }
+
+      case 'analysis': {
+        // SysEngineer: tables are the primary output
+        const tableData = parseTableContent(content);
+        if (tableData) {
+          artifacts.push({
+            id: crypto.randomUUID(),
+            type: 'table',
+            data: tableData,
+            timestamp: new Date()
+          });
+        }
+        // Also render as document for any prose
+        if (proseContent || !tableData) {
+          const sections = parseDocumentSections(content);
+          artifacts.push({
+            id: crypto.randomUUID(),
+            type: 'document',
+            data: { title: 'Systems Analysis', sections: sections.length > 0 ? sections : [{ title: 'Output', content }] },
+            timestamp: new Date()
+          });
+        }
+        break;
+      }
+
+      case 'security': {
+        // Security: diagnostic document
+        const sections = parseDocumentSections(content);
+        artifacts.push({
+          id: crypto.randomUUID(),
+          type: 'document',
+          data: { title: 'Security Audit', sections: sections.length > 0 ? sections : [{ title: 'Findings', content }] },
+          timestamp: new Date()
+        });
+        const tableData = parseTableContent(content);
+        if (tableData) {
+          artifacts.push({
+            id: crypto.randomUUID(),
+            type: 'table',
+            data: tableData,
+            timestamp: new Date()
+          });
+        }
+        break;
+      }
+
+      default: {
+        // Fallback: document
+        artifacts.push({
+          id: crypto.randomUUID(),
+          type: 'document',
+          data: { title: 'Output', sections: [{ title: 'Response', content }] },
+          timestamp: new Date()
+        });
+        break;
+      }
     }
 
     return artifacts;
