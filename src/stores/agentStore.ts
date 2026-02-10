@@ -23,6 +23,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     'api': [],
     'microservices': [],
     'sys-engineer': [],
+    'resume-ai': [],
   },
   activeAgent: null,
   setActiveAgent: (agentId) => set({ activeAgent: agentId }),

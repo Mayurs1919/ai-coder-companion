@@ -12,6 +12,7 @@ import { AgentWorkspace } from "@/components/agents/AgentWorkspace";
 import { PRReviewerWorkspace } from "@/components/agents/PRReviewerWorkspace";
 import { MicroservicesWorkspace } from "@/components/agents/MicroservicesWorkspace";
 import { SysEngineerWorkspace } from "@/components/agents/SysEngineerWorkspace";
+import { ResumeAIWorkspace } from "@/components/agents/ResumeAIWorkspace";
 import { UsageSection } from "@/components/usage/UsageSection";
 import { ExecutionSurface } from "@/components/execution/ExecutionSurface";
 import { LandingPage } from "@/components/landing/LandingPage";
@@ -90,6 +91,16 @@ const App = () => (
                 <ProtectedRoute>
                   <AppLayout>
                     <PRReviewerWorkspace />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/agent/resume-ai"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ResumeAIWorkspace />
                   </AppLayout>
                 </ProtectedRoute>
               }

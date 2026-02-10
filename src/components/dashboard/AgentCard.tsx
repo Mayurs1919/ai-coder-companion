@@ -14,6 +14,7 @@ import {
   Network,
   Webhook,
   Boxes,
+  FileUser,
 } from 'lucide-react';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -27,6 +28,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Network,
   Webhook,
   Boxes,
+  FileUser,
 };
 
 interface AgentCardProps {

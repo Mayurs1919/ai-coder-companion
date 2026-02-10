@@ -6,7 +6,8 @@ export type AgentId =
   | 'docs'
   | 'api'
   | 'microservices'
-  | 'sys-engineer';
+  | 'sys-engineer'
+  | 'resume-ai';
 
 export type AgentStatus = 'idle' | 'processing' | 'success' | 'error';
 
@@ -106,6 +107,14 @@ export const AGENTS: Agent[] = [
     description: 'Designs microservices architecture for scalability',
     icon: 'Boxes',
     color: 'agent-microservices',
+    status: 'idle',
+  },
+  {
+    id: 'resume-ai',
+    name: 'Resume AI',
+    description: 'Voice-driven resume upload, analysis, and matching',
+    icon: 'FileUser',
+    color: 'agent-resume',
     status: 'idle',
   },
 ];
