@@ -74,6 +74,7 @@ export default {
           api: "hsl(var(--agent-api))",
           microservices: "hsl(var(--agent-microservices))",
           "sys-engineer": "hsl(var(--agent-sys-engineer))",
+          resume: "hsl(var(--agent-resume))",
         },
         console: {
           bg: "hsl(var(--console-bg))",

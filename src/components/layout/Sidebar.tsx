@@ -19,6 +19,7 @@ import {
   TestTube2,
   BookOpen,
   BarChart3,
+  FileUser,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -64,6 +65,12 @@ export function Sidebar() {
         { path: '/agent/docs', icon: BookOpen, label: 'Documentation', color: 'agent-docs' },
         { path: '/agent/reviewer', icon: GitPullRequest, label: 'PR Reviewer', color: 'agent-reviewer' },
         { path: '/security', icon: Shield, label: 'Security Scan', color: 'agent-security' },
+      ],
+    },
+    {
+      title: 'AI AGENTS',
+      items: [
+        { path: '/agent/resume-ai', icon: FileUser, label: 'Resume AI', color: 'agent-resume' },
       ],
     },
   ];

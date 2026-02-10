@@ -44,6 +44,48 @@ export type Database = {
         }
         Relationships: []
       }
+      resumes: {
+        Row: {
+          analysis_result: Json | null
+          created_at: string
+          file_size_kb: number
+          file_type: string
+          filename: string
+          id: string
+          parsed_data: Json | null
+          status: string
+          storage_path: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analysis_result?: Json | null
+          created_at?: string
+          file_size_kb: number
+          file_type: string
+          filename: string
+          id?: string
+          parsed_data?: Json | null
+          status?: string
+          storage_path: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analysis_result?: Json | null
+          created_at?: string
+          file_size_kb?: number
+          file_type?: string
+          filename?: string
+          id?: string
+          parsed_data?: Json | null
+          status?: string
+          storage_path?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
