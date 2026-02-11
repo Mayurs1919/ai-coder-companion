@@ -1,31 +1,30 @@
 import { useState, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import {
-  Mic,
-  MicOff,
   Upload,
   FileText,
   Brain,
   Target,
   Star,
-  Loader2,
   CheckCircle2,
   AlertCircle,
   X,
   Sparkles,
+  Mic,
   Volume2,
 } from 'lucide-react';
+import { ResumeResultPanel } from './resume/ResumeResultPanel';
+import { ResumeListPanel } from './resume/ResumeListPanel';
 
-type AgentState = 'idle' | 'listening' | 'uploading' | 'processing' | 'speaking' | 'success' | 'error';
+type AgentState = 'idle' | 'uploading' | 'processing' | 'success' | 'error';
 
-interface ResumeRecord {
+export interface ResumeRecord {
   id: string;
   filename: string;
   file_type: string;
@@ -34,20 +33,17 @@ interface ResumeRecord {
   created_at: string;
 }
 
-interface AnalysisResult {
-  action: string;
-  result: Record<string, unknown>;
-}
-
 export function ResumeAIWorkspace() {
   const { session } = useAuth();
   const [agentState, setAgentState] = useState<AgentState>('idle');
   const [resumes, setResumes] = useState<ResumeRecord[]>([]);
   const [selectedResume, setSelectedResume] = useState<ResumeRecord | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [report, setReport] = useState<string | null>(null);
+  const [reportAction, setReportAction] = useState<string>('');
   const [jobDescription, setJobDescription] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const jdFileInputRef = useRef<HTMLInputElement>(null);
 
   // Upload resume
   const handleUpload = useCallback(async (file: File) => {
@@ -55,10 +51,8 @@ export function ResumeAIWorkspace() {
       toast.error('Please sign in to upload resumes');
       return;
     }
-
     setAgentState('uploading');
     setUploadProgress(0);
-
     const progressInterval = setInterval(() => {
       setUploadProgress(prev => Math.min(prev + 10, 90));
     }, 200);
@@ -66,28 +60,21 @@ export function ResumeAIWorkspace() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resume-upload`,
         {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
+          headers: { Authorization: `Bearer ${session.access_token}` },
           body: formData,
         }
       );
-
       clearInterval(progressInterval);
-
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.error || 'Upload failed');
       }
-
       const data = await response.json();
       setUploadProgress(100);
-
       const newResume: ResumeRecord = {
         id: data.resume_id,
         filename: data.filename,
@@ -96,12 +83,10 @@ export function ResumeAIWorkspace() {
         status: data.status,
         created_at: new Date().toISOString(),
       };
-
       setResumes(prev => [newResume, ...prev]);
       setSelectedResume(newResume);
       setAgentState('success');
-      toast.success(`Resume "${data.filename}" uploaded successfully`);
-
+      toast.success(`Resume "${data.filename}" uploaded`);
       setTimeout(() => setAgentState('idle'), 2000);
     } catch (error) {
       clearInterval(progressInterval);
@@ -117,18 +102,38 @@ export function ResumeAIWorkspace() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Handle JD file upload — extract text and set as jobDescription
+  const handleJDFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (jdFileInputRef.current) jdFileInputRef.current.value = '';
+
+    try {
+      if (file.type === 'text/plain') {
+        const text = await file.text();
+        setJobDescription(text);
+        toast.success('Job description loaded');
+      } else {
+        // For PDF/DOCX, read raw text (basic extraction)
+        const buffer = await file.arrayBuffer();
+        const decoder = new TextDecoder('utf-8', { fatal: false });
+        const rawText = decoder.decode(buffer).replace(/[^\x20-\x7E\n\r\t]/g, ' ').substring(0, 6000);
+        setJobDescription(rawText);
+        toast.success('Job description loaded (text extracted)');
+      }
+    } catch {
+      toast.error('Failed to read job description file');
+    }
+  };
+
   // Analyze resume
   const handleAnalyze = useCallback(async (action: 'analyze' | 'match' | 'score') => {
     if (!selectedResume || !session?.access_token) return;
-
     setAgentState('processing');
-    setAnalysisResult(null);
+    setReport(null);
 
     try {
-      const body: Record<string, unknown> = {
-        resume_id: selectedResume.id,
-        action,
-      };
+      const body: Record<string, unknown> = { resume_id: selectedResume.id, action };
       if (action === 'match' && jobDescription) {
         body.job_description = jobDescription;
       }
@@ -151,7 +156,8 @@ export function ResumeAIWorkspace() {
       }
 
       const data = await response.json();
-      setAnalysisResult({ action: data.action, result: data.result });
+      setReport(data.report);
+      setReportAction(data.action);
       setAgentState('success');
       toast.success(`Resume ${action} complete`);
       setTimeout(() => setAgentState('idle'), 2000);
@@ -162,20 +168,15 @@ export function ResumeAIWorkspace() {
     }
   }, [selectedResume, session, jobDescription]);
 
-  const getStateConfig = () => {
-    const configs: Record<AgentState, { color: string; icon: typeof Mic; label: string; pulse: boolean }> = {
-      idle: { color: 'bg-muted', icon: Mic, label: 'Ready', pulse: false },
-      listening: { color: 'bg-blue-500', icon: Mic, label: 'Listening...', pulse: true },
-      uploading: { color: 'bg-amber-500', icon: Upload, label: 'Uploading...', pulse: true },
-      processing: { color: 'bg-purple-500', icon: Brain, label: 'Analyzing...', pulse: true },
-      speaking: { color: 'bg-green-500', icon: Volume2, label: 'Speaking...', pulse: true },
-      success: { color: 'bg-emerald-500', icon: CheckCircle2, label: 'Complete', pulse: false },
-      error: { color: 'bg-destructive', icon: AlertCircle, label: 'Error', pulse: false },
-    };
-    return configs[agentState];
+  const stateConfigs: Record<AgentState, { color: string; icon: typeof Mic; label: string; pulse: boolean }> = {
+    idle: { color: 'bg-muted', icon: Sparkles, label: 'Ready', pulse: false },
+    uploading: { color: 'bg-amber-500', icon: Upload, label: 'Uploading...', pulse: true },
+    processing: { color: 'bg-purple-500', icon: Brain, label: 'Analyzing...', pulse: true },
+    success: { color: 'bg-emerald-500', icon: CheckCircle2, label: 'Complete', pulse: false },
+    error: { color: 'bg-destructive', icon: AlertCircle, label: 'Error', pulse: false },
   };
 
-  const stateConfig = getStateConfig();
+  const stateConfig = stateConfigs[agentState];
   const StateIcon = stateConfig.icon;
 
   return (
@@ -188,32 +189,29 @@ export function ResumeAIWorkspace() {
             Resume AI
           </h1>
           <p className="text-muted-foreground mt-1">
-            Upload, analyze, and match resumes with AI-powered intelligence
+            Upload, analyze, and match resumes with AI-powered hiring intelligence
           </p>
         </div>
         <Badge
           variant="outline"
-          className={cn(
-            'gap-2 px-3 py-1.5 text-sm',
-            stateConfig.pulse && 'animate-pulse'
-          )}
+          className={cn('gap-2 px-3 py-1.5 text-sm', stateConfig.pulse && 'animate-pulse')}
         >
           <div className={cn('w-2 h-2 rounded-full', stateConfig.color)} />
           {stateConfig.label}
         </Badge>
       </div>
 
-      {/* Agent Orb - Visual State Indicator */}
-      <div className="flex justify-center py-6">
+      {/* Agent Orb */}
+      <div className="flex justify-center py-4">
         <div className="relative">
           <div
             className={cn(
-              'w-24 h-24 rounded-full flex items-center justify-center transition-all duration-500',
+              'w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500',
               stateConfig.color,
               stateConfig.pulse && 'shadow-lg shadow-primary/30'
             )}
           >
-            <StateIcon className="w-10 h-10 text-white" />
+            <StateIcon className="w-8 h-8 text-white" />
           </div>
           {stateConfig.pulse && (
             <>
@@ -238,29 +236,22 @@ export function ResumeAIWorkspace() {
       )}
 
       {/* Action Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Upload Card */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card
-          className={cn(
-            'cursor-pointer transition-all hover:border-primary/50 hover:shadow-lg',
-            agentState === 'uploading' && 'border-amber-500/50'
-          )}
+          className="cursor-pointer transition-all hover:border-primary/50 hover:shadow-lg"
           onClick={() => fileInputRef.current?.click()}
         >
           <CardHeader className="pb-3">
-            <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mb-2">
-              <Upload className="w-6 h-6 text-amber-500" />
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center mb-2">
+              <Upload className="w-5 h-5 text-amber-500" />
             </div>
-            <CardTitle className="text-base">Upload Resume</CardTitle>
+            <CardTitle className="text-sm">Upload Resume</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              PDF, DOCX, or TXT files up to 5MB
-            </p>
+            <p className="text-xs text-muted-foreground">PDF, DOCX, or TXT up to 5MB</p>
           </CardContent>
         </Card>
 
-        {/* Analyze Card */}
         <Card
           className={cn(
             'cursor-pointer transition-all hover:border-primary/50 hover:shadow-lg',
@@ -269,19 +260,16 @@ export function ResumeAIWorkspace() {
           onClick={() => handleAnalyze('analyze')}
         >
           <CardHeader className="pb-3">
-            <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mb-2">
-              <Brain className="w-6 h-6 text-purple-500" />
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center mb-2">
+              <Brain className="w-5 h-5 text-purple-500" />
             </div>
-            <CardTitle className="text-base">Analyze Resume</CardTitle>
+            <CardTitle className="text-sm">Analyze</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Extract skills, experience, and education
-            </p>
+            <p className="text-xs text-muted-foreground">Extract skills, experience & education</p>
           </CardContent>
         </Card>
 
-        {/* Match Card */}
         <Card
           className={cn(
             'cursor-pointer transition-all hover:border-primary/50 hover:shadow-lg',
@@ -290,143 +278,75 @@ export function ResumeAIWorkspace() {
           onClick={() => handleAnalyze('match')}
         >
           <CardHeader className="pb-3">
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-2">
-              <Target className="w-6 h-6 text-emerald-500" />
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-2">
+              <Target className="w-5 h-5 text-emerald-500" />
             </div>
-            <CardTitle className="text-base">Match Resume</CardTitle>
+            <CardTitle className="text-sm">Match</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Compare against a job description
-            </p>
+            <p className="text-xs text-muted-foreground">Compare against a job description</p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className={cn(
+            'cursor-pointer transition-all hover:border-primary/50 hover:shadow-lg',
+            !selectedResume && 'opacity-50 pointer-events-none'
+          )}
+          onClick={() => handleAnalyze('score')}
+        >
+          <CardHeader className="pb-3">
+            <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center mb-2">
+              <Star className="w-5 h-5 text-yellow-500" />
+            </div>
+            <CardTitle className="text-sm">Score</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">Detailed quality assessment</p>
           </CardContent>
         </Card>
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        accept=".pdf,.docx,.txt"
-        onChange={handleFileSelect}
-      />
+      <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.docx,.txt" onChange={handleFileSelect} />
+      <input ref={jdFileInputRef} type="file" className="hidden" accept=".pdf,.docx,.doc,.txt" onChange={handleJDFileSelect} />
 
-      {/* Job Description Input (for matching) */}
+      {/* Job Description Input */}
       {selectedResume && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Job Description (for matching)</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Job Description (for matching)</CardTitle>
+              <Button variant="outline" size="sm" onClick={() => jdFileInputRef.current?.click()}>
+                <Upload className="w-3 h-3 mr-1" />
+                Upload JD File
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <textarea
               value={jobDescription}
               onChange={(e) => setJobDescription(e.target.value)}
-              placeholder="Paste a job description here to match against the selected resume..."
-              className="w-full h-24 bg-transparent border border-border rounded-lg p-3 text-sm resize-none outline-none focus:border-primary transition-colors"
+              placeholder="Paste a job description here or upload a file (PDF, DOCX, TXT)..."
+              className="w-full h-28 bg-transparent border border-border rounded-lg p-3 text-sm resize-none outline-none focus:border-primary transition-colors"
             />
           </CardContent>
         </Card>
       )}
 
-      {/* Selected Resume & Uploaded Resumes */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Uploaded Resumes */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Uploaded Resumes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {resumes.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">
-                No resumes uploaded yet
-              </p>
-            ) : (
-              <ScrollArea className="max-h-60">
-                <div className="space-y-2">
-                  {resumes.map((r) => (
-                    <button
-                      key={r.id}
-                      onClick={() => setSelectedResume(r)}
-                      className={cn(
-                        'w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors',
-                        selectedResume?.id === r.id
-                          ? 'bg-primary/10 border border-primary/30'
-                          : 'bg-muted/30 hover:bg-muted/50'
-                      )}
-                    >
-                      <FileText className="w-4 h-4 text-primary flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{r.filename}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {r.file_type.toUpperCase()} · {r.file_size_kb}KB
-                        </p>
-                      </div>
-                      <Badge variant="outline" className="text-[10px] flex-shrink-0">
-                        {r.status}
-                      </Badge>
-                    </button>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-          </CardContent>
-        </Card>
+      {/* Resumes List + Selected Info */}
+      <ResumeListPanel
+        resumes={resumes}
+        selectedResume={selectedResume}
+        onSelect={setSelectedResume}
+      />
 
-        {/* Score Card */}
-        {selectedResume && (
-          <Card
-            className="cursor-pointer transition-all hover:border-primary/50 hover:shadow-lg"
-            onClick={() => handleAnalyze('score')}
-          >
-            <CardHeader className="pb-3">
-              <div className="w-12 h-12 rounded-xl bg-yellow-500/10 flex items-center justify-center mb-2">
-                <Star className="w-6 h-6 text-yellow-500" />
-              </div>
-              <CardTitle className="text-base">Score Resume</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Get a detailed quality score with category breakdowns
-              </p>
-              {selectedResume && (
-                <p className="text-xs text-primary mt-2">
-                  Selected: {selectedResume.filename}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Analysis Result */}
-      {analysisResult && (
-        <Card className="animate-fade-in">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-primary" />
-                {analysisResult.action === 'analyze'
-                  ? 'Resume Analysis'
-                  : analysisResult.action === 'match'
-                  ? 'Match Report'
-                  : 'Score Report'}
-              </CardTitle>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAnalysisResult(null)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="max-h-96">
-              <pre className="text-sm whitespace-pre-wrap font-mono bg-muted/30 rounded-lg p-4">
-                {JSON.stringify(analysisResult.result, null, 2)}
-              </pre>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+      {/* Analysis Report */}
+      {report && (
+        <ResumeResultPanel
+          report={report}
+          action={reportAction}
+          onClose={() => setReport(null)}
+        />
       )}
     </div>
   );
