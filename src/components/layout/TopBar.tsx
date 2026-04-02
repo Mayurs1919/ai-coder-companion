@@ -1,9 +1,11 @@
-import { Bell, Settings, Zap, Activity } from 'lucide-react';
+import { Bell, Settings, Zap, Activity, Terminal } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { UserMenu } from './UserMenu';
 
 export function TopBar() {
+  const navigate = useNavigate();
   return (
     <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4">
       {/* Left: Status indicators */}
@@ -28,6 +30,15 @@ export function TopBar() {
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2">
+        <Button
+          variant="default"
+          size="sm"
+          className="gap-2 font-mono text-xs"
+          onClick={() => navigate('/execute')}
+        >
+          <Terminal className="h-4 w-4" />
+          Execute
+        </Button>
         <Button variant="ghost" size="icon" className="h-9 w-9">
           <Bell className="h-4 w-4" />
         </Button>
