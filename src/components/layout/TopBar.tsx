@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { UserMenu } from './UserMenu';
 
 export function TopBar() {
+  const navigate = useNavigate();
   return (
     <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4">
       {/* Left: Status indicators */}
