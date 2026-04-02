@@ -1,4 +1,5 @@
-import { Bell, Settings, Zap, Activity } from 'lucide-react';
+import { Bell, Settings, Zap, Activity, Terminal } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { UserMenu } from './UserMenu';
